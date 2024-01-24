@@ -5,52 +5,75 @@ require "dsa/lua/stdio"
 ---@class DSA_Array
 ---@field type type
 ---@field buffer any[]
----@field length int
+---@field index int
 DSA_Array = {} 
 DSA_Array.mt = {} ---@type metatable
 DSA_Array.__impl = {} -- internal implementation stuff
 
-function DSA_Array:new(entry, ...)  ---@return DSA_Array
-    local list = {[0] = entry, ...}
-    local inst = { ---@type DSA_Array
-        type = type(entry),
-        buffer = list,
-        length = #list
-    } 
-    for _, v in DSA_Array.iterate(inst) do
-        assert(type(v) == inst.type, "array elements must be of the same type!")
-    end
-    return setmetatable(inst, DSA_Array.mt) 
+function DSA_Array:new(typename) ---@param typename type
+    local inst = setmetatable({ ---@type DSA_Array
+        type = typename,
+        buffer = {},
+        index = -1, -- Needed for correct first push_back
+    }, DSA_Array.mt)
+    return inst
 end
 
-function DSA_Array:push_back(entry)
-    self.length = self.length + 1
-    self.buffer[self.length] = entry
+function DSA_Array:assign(entry, ...) -- Directly reset the internal buffer.
+    assert(entry ~= nil, "Need at least 1 argument to infer the type of!")
+    local inst = self
+    if inst == DSA_Array then -- Is main class so need to create a new instance
+        inst = DSA_Array:new(type(entry))
+    end
+    inst.buffer = {[0] = entry, ...} -- old table is thrown away :(
+    inst.index = #inst.buffer
+    return inst:validate()
+end
+
+function DSA_Array:validate() -- Check if all array elements are the same type.
+    for _, v in self:iterate("forward") do
+        local a, b = type(v), self.type
+        if a ~= b then -- avoid evaluating all args before error
+            error(string.format("Invalid type(v) = %s (self.type = %s)", a, b))
+        end
+    end
+    return self
+end
+
+function DSA_Array:length() -- Number of contiguous items currently stored.
+    return self.index + 1 
+end
+
+function DSA_Array:push_back(entry) -- For performance, type(entry) not checked.
+    self.index = self.index + 1
+    self.buffer[self.index] = entry
     return self
 end
 
 function DSA_Array:pop_back()
-    local value = self.buffer[self.length]
-    self.buffer[self.length] = nil
-    self.length = self.length - 1
+    local value = self.buffer[self.index]
+    self.buffer[self.index] = nil
+    self.index = self.index - 1
     return value
 end
 
 function DSA_Array:erase(first, last)
     last = last or (first + 1) -- if none, delete only self.buffer[start]
-    local length = self.length
-    local erased = last - first
+    local length = self.index
+    local erased = last - first + 1 -- count of erased elements (off by one -_-)
+    printf("first=%i,last=%i,length=%i,erased=%i\n", first, last, length, erased)
     for i = first, last do
         self.buffer[i] = nil
     end
     if last < length then -- Fix array in place if gaps were made.
         local ii = first -- Index range starting with first gap
-        for i = last + 1, length do -- Index range starting with first non-gap
+        -- Index range starting with first non-gap
+        for i in self:iterate("forward", last) do 
             self.buffer[i], self.buffer[ii] = self.buffer[ii], self.buffer[i]
             ii = ii + 1
         end
     end
-    self.length = length - erased
+    self.index = length - erased
     return self
 end
 
@@ -58,10 +81,13 @@ end
 ---|> "forward"
 ---|  "reverse"
 
-function DSA_Array:iterate(mode) ---@param mode iter_modes?
+function DSA_Array:iterate(mode, from) ---@param mode iter_modes?
     mode = mode or "forward"
+    -- Our starting index - 1, pre-incremented by first call to iterator fn.
+    ---@type int
+    from = from or (self.buffer[0] ~= nil and -1) or 0 
     local fns = DSA_Array.__impl.iter_fns
-    local control = (mode == "forward" and -1) or (self.length + 1)
+    local control = (mode == "forward" and from) or (self.index + 1)
     return fns[mode], self.buffer, control
 end
 
@@ -71,12 +97,12 @@ end
 
 function DSA_Array:sort(mode) ---@param mode (sort_modes|sort_fn)?
     local buffer = self.buffer
-    local limit = self.length - 1 -- avoid indexing into buffer[length + 1]
     local fns = DSA_Array.__impl.sort_fns
     local compare_fn = (type(mode) == "function" and mode) or fns[mode or "ascending"]
-    for i = 0, limit do -- selection sort cuz its easy and can be done in-place
+    for i in self:iterate() do -- Selection sort
         local marked = i
-        for ii = i + 1, limit do
+        -- We don't use i + 1 since control always starts out (index - 1).
+        for ii in self:iterate("forward", i) do 
             if compare_fn(buffer[ii], buffer[marked]) then
                 marked = ii
             end
