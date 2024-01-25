@@ -34,6 +34,8 @@ try_catch(function()
     loopy(array)
     loopy(array:erase(0, 2))
     loopy(array:erase(1, 3))
+    loopy(array:sort("ascending"))
+    loopy(array:sort("descending"))
 end)
 
 try_catch(function()

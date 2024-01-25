@@ -68,7 +68,7 @@ function DSA_Array:erase(first, last)
     if last < length then -- Fix array in place if gaps were made.
         local ii = first -- Index range starting with first gap
         -- Index range starting with first non-gap
-        for i in self:iterate("forward", last) do 
+        for i in self:iterate("forward", last + 1) do 
             self.buffer[i], self.buffer[ii] = self.buffer[ii], self.buffer[i]
             ii = ii + 1
         end
@@ -83,9 +83,9 @@ end
 
 function DSA_Array:iterate(mode, from) ---@param mode iter_modes?
     mode = mode or "forward"
-    -- Our starting index - 1, pre-incremented by first call to iterator fn.
+    -- Our starting index - 1, is incremented by first call to iterator fn.
     ---@type int
-    from = from or (self.buffer[0] ~= nil and -1) or 0 
+    from = (from and from - 1) or (self.buffer[0] ~= nil and -1) or 0 
     local fns = DSA_Array.__impl.iter_fns
     local control = (mode == "forward" and from) or (self.index + 1)
     return fns[mode], self.buffer, control
@@ -101,8 +101,7 @@ function DSA_Array:sort(mode) ---@param mode (sort_modes|sort_fn)?
     local compare_fn = (type(mode) == "function" and mode) or fns[mode or "ascending"]
     for i in self:iterate() do -- Selection sort
         local marked = i
-        -- We don't use i + 1 since control always starts out (index - 1).
-        for ii in self:iterate("forward", i) do 
+        for ii in self:iterate("forward", i + 1) do 
             if compare_fn(buffer[ii], buffer[marked]) then
                 marked = ii
             end
