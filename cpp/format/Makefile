@@ -5,27 +5,47 @@ OBJDIR=./obj
 
 # -*- SOURCE FILES -----------------------------------------------------------*-
 
-SRC=$(wildcard *.cpp)
-EXE=$(patsubst %.cpp, $(BINDIR)/%, $(SRC))
+CFLAGS+=$(DEBUGFLAGS)
+CXXFLAGS+=$(DEBUGFLAGS)
+
+PARSE=parse
+PARSE_SRC=$(addsuffix .cpp, $(PARSE))
+PARSE_OBJ=$(patsubst %, $(OBJDIR)/%.o, $(PARSE))
+
+CMAIN=cmain
+CMAIN_EXE=$(patsubst %, $(BINDIR)/%, $(CMAIN))
+CMAIN_OBJ=$(patsubst %, $(OBJDIR)/%.o, $(CMAIN))
+
+CPPMAIN=cppmain
+CPPMAIN_EXE=$(patsubst %, $(BINDIR)/%, $(CPPMAIN))
+CPPMAIN_OBJ=$(patsubst %, $(OBJDIR)/%.o, $(CPPMAIN))
+
 
 # -*- BEGIN:	RECIPES ------------------------------------------------------*-
 
-all: $(EXE)
-
+all: $(CMAIN_EXE) $(CPPMAIN_EXE) | $(BINDIR)
+	
 $(BINDIR) $(OBJDIR):
 	$(MKDIR) $@
+	
+$(CMAIN_EXE): $(CMAIN_OBJ) $(PARSE_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^
 
-$(BINDIR)/%: %.cpp | $(BINDIR)
-	$(CXX) $(DEBUGFLAGS) $(CXXFLAGS) -o $@ $<
+$(CPPMAIN_EXE): $(CPPMAIN_OBJ) $(PARSE_OBJ)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+	
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $^
+	
+$(OBJDIR)/%.o: %.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c -o $@ $^
 
 print:
 	@echo Directories: $(BINDIR) $(OBJDIR)
-	@echo Sourcefiles: $(SRC)
-	@echo Executables: $(EXE)
 
 clean:
-	$(RM) $(EXE)
+	$(RM) $(BINDIR)/* $(OBJDIR)/*.o
 
-.PHONY: all clean
+.PHONY: all clean uninstall
 
 # -*- END:		RECIPES ------------------------------------------------------*-

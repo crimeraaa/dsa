@@ -14,7 +14,8 @@
 			"*.h": "c",
 			".clangd": "yaml",
 			".clang_format": "yaml",
-			"*.tcc": "cpp"
+			"*.tcc": "cpp",
+			"array": "cpp"
 		}
 	}
 }

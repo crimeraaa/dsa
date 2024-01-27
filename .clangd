@@ -1,0 +1,35 @@
+CompileFlags:
+  Add: [
+    "-I.",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-Wshadow",
+    "-pedantic",
+  ]
+Index:
+  Background: Skip
+  StandardLibrary: No # Index stdlib for completion?
+Hover:
+  ShowAKA: Yes # Print desugared types like `value_type (aka int)`
+Diagnostics:
+  UnusedIncludes: None # Shut up
+If:
+  PathMatch: [.*\.c, .*\.h] # Apply this config to C-source files and headers
+  CompileFlags:
+    Compiler: gcc
+    Add: [
+      "-xc", 
+      "-std=c11"
+    ]
+
+If:
+  PathMatch: [.*\.cpp, .*\.hpp, .*\.tcc, .*\.tpp] # C++ source, headers, templates
+  Style:
+    FullyQualifiedNamespaces: Yes # No 'using' decl's, spell out fullname.
+  CompileFlags:
+    Compiler: g++ # Will get system includes properly
+    Add: [
+      "-xc++", # clang defaults to objective C++ for some reason -_-
+      "-std=c++17"
+    ]

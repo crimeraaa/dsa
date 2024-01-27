@@ -45,3 +45,11 @@ std::string csformat(const char *fmts, Args ...args)
 endfn:
     return writer;    
 }
+
+/**
+ * @brief   One of `snprintf` or `swprintf`.
+ * @tparam  CharT   Desired character type.
+ * @tparam ...Args  Variadic arguments to be unpacked to the function call.
+ */
+template<typename CharT, typename ...Args>
+using FmtFn = int(*)(CharT *, size_t, const CharT*, Args...);
