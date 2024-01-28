@@ -15,7 +15,8 @@
 			".clangd": "yaml",
 			".clang_format": "yaml",
 			"*.tcc": "cpp",
-			"array": "cpp"
+			"array": "cpp",
+			"cstddef": "cpp"
 		}
 	}
 }

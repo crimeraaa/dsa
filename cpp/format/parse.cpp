@@ -1,94 +1,75 @@
-#include <array>
+/**
+ * @file        parse.cpp
+ *
+ * @author      crimeraaa
+ *
+ * @date        27 January 2024
+ * 
+ * @brief       Actual implementation of `parse.h`'s exposed functions.
+ */
 #include <cassert>
-#include <climits>
 #include <cstdarg> /* va_list and accompaniying functions */
-#include <cstdlib>
+#include <cstddef>
 #include <cstdio> /* Too lazy to reimplement fputc, fputs and friends */
-#include <type_traits>
+#include <cwchar> /* std::fputwc, std::fputws */
 
 #include "parse.h"
+#include "impl/parsetypes.hpp"
+#include "impl/parsefns.hpp"
+#include "impl/write_integer.impl.hpp"
 
-// Generally speaking, our largest integer types are 64-bits.
-static constexpr size_t MAX_BINARY_LENGTH = (CHAR_BIT * sizeof(std::size_t));
-
-static constexpr char g_digitchars[] = "0123456789abcdef";
-
-/**
- * @brief   Reverse the contents of a nul-terminated C-string in place.
- */
-char *reverse_string(char *buffer, size_t length)
+void write_stream(std::FILE *stream, const char *fmts, ...)
 {
-    for (size_t i = 0, ii = length - 1; i < ii; i++, ii--) {
-        char ch = buffer[i];
-        buffer[i] = buffer[ii];
-        buffer[ii] = ch;
-    }
-    return buffer;
+    std::va_list args;
+    va_start(args, fmts); // args now points to first vararg, whatever it may be
+    return write_va_list(stream, fmts, args);
 }
 
-template<typename IntT>
-void write_integer(std::FILE *stream, IntT arg, int base = 10)
+void write_va_list(std::FILE *stream, const char *fmts, std::va_list args)
 {
-    static_assert(std::is_integral<IntT>::value, "bruh");
-    if (arg == 0) {
-        std::fputc('0', stream);
-        return;
-    }
-    // Extras: 1 for nul char, 1 for dash, 2 for base.
-    char buffer[MAX_BINARY_LENGTH + 4] = {0}; 
-    size_t length = 0;
-    bool negative = false;
-    if constexpr(std::is_signed<IntT>::value) {
-        if (arg < 0) {
-            arg = std::abs(arg); // TODO: Fix conversion for INT_MIN and such
-            negative = true;
+    const char *ptr = fmts; // Keep track of current character in format string.
+    bool is_fmtspec = false;
+    char ch;
+    // ptr itself is incremented, but postfix returns the original value
+    while ((ch = *ptr++) != '\0') {
+        if (ch == '%') {
+            is_fmtspec = true;
+            continue; // Proceed to next token
+        }
+        if (!is_fmtspec) {
+            std::fputc(ch, stream);
+        } else {
+            ptr = parse_fmt(stream, ptr, args, ch);
+            is_fmtspec = false;
         }
     }
-    // Read the number from right to left, we'll reverse it later.
-    // The result of module will give us the current rightmost digit,
-    // which we can use to index into `g_digitchars`, conviniently enough.
-    while (arg > 0) {
-        buffer[length++] = g_digitchars[arg % base];
-        arg /= base;
-    }
-    assert(length <= MAX_BINARY_LENGTH); // I hope this never happens
-    if (negative) {
-        buffer[length++] = '-';
-    }
-    // buffer was 0-initialized so very last slot should be '\0' itself.
-    std::fputs(reverse_string(buffer, length), stream);
+    va_end(args);
 }
 
-/**
- * @brief   Does the heavy lifting of parsing a single instance of a `%`.
- *          Lots of work goes into this, see C's printf spec.
- * @param   stream      Where the output is heading.
- * @param   ptr         Current position in the format string.
- * @param   args        Variadic argument list on the stack. Pop as we go!
- * @param   spec        The current format specifier we have.
- */
-void parse_fmt(std::FILE *stream, const char *ptr, std::va_list args, char spec)
+const char *parse_fmt(std::FILE *stream, const char *next, std::va_list args, char ch)
 {
-    // TODO: Parse modifiers to determine if need, say, long int or wchar string
-    (void)ptr;
-    // Print lone format specifiers (no modifiers)
-    switch (spec)
+    FmtSpec what = parse_mod(next, ch);
+    switch (what.tag)
     {
         case '%': {
             break;
         }
         case 'c': {
-            // va_arg promotes char to int so get an int then cast down
-            std::fputc(va_arg(args, int), stream);
+            // Both `char` and `wchar_t` are promoted to `int`.
+            if (what.mod == FmtMod::is_long) {
+                std::fputwc(va_arg(args, int), stream);
+            } else {
+                std::fputc(va_arg(args, int), stream);
+            }
             break;
         }
         case 'd': // fall-through
         case 'i': {
-            write_integer(stream, va_arg(args, int));
+            write_signed(stream, args, what.mod);
             break;
         }
         case 'u': {
-            write_integer(stream, va_arg(args, unsigned));
+            write_unsigned(stream, args, what.mod);
             break;
         }
         case 'f': {
@@ -98,11 +79,14 @@ void parse_fmt(std::FILE *stream, const char *ptr, std::va_list args, char spec)
             break;
         }
         case 's': {
-            std::fputs(va_arg(args, char*), stream);
+            if (what.mod == FmtMod::is_long) {
+                std::fputws(va_arg(args, wchar_t*), stream);
+            } else {
+                std::fputs(va_arg(args, char*), stream);
+            }
             break;
         }
         case 'p': {
-            // TODO: Figure out how to print a memory address
             void *p = va_arg(args, void*);
             (void)p;
             break;
@@ -111,29 +95,82 @@ void parse_fmt(std::FILE *stream, const char *ptr, std::va_list args, char spec)
             break;
         }
     }
+    return what.nextptr;
 }
 
-void write_format(std::FILE *stream, const char *fmts, ...)
+FmtSpec parse_mod(const char *next, char ch)
 {
-    const char *ptr = fmts; // Keep track of current char
-    std::va_list args;
-    bool is_fmtspec = false;
-    char ch;
-
-    va_start(args, fmts); // args now points to first vararg, whatever it may be
-    // Parse until NUL char is reached
-    // ptr itself is incremented but postfix returns the original value
-    while ((ch = *ptr++) != '\0') {
-        if (ch == '%') {
-            is_fmtspec = true;
-            ch = *ptr++; // was already incremented so go to next token
+    // For now, use `nextptr` to peek ahead of `ch` in the format string.
+    FmtSpec what;
+    what.nextptr = next;
+    what.mod = FmtMod::is_none;
+    what.tag = ch; // If no modifiers found this will stay as-is.
+    switch (ch)
+    {
+        case 'l': {
+            what.mod = FmtMod::is_long; 
+            if (*what.nextptr == 'l') {
+                what.mod = FmtMod::is_long_long;
+                what.nextptr++;
+            }
+            // Remember postfix increment returns the previous value
+            what.tag = *what.nextptr++; 
+            break;
+        }        
+        case 'h': {
+            what.mod = FmtMod::is_short;
+            if (*what.nextptr == 'h') {
+                what.mod = FmtMod::is_short_short;
+                what.nextptr++;
+            }
+            what.tag = *what.nextptr++;
+            break;
         }
-        if (!is_fmtspec) {
-            std::fputc(ch, stream);
-        } else {
-            parse_fmt(stream, ptr, args, ch);
-            is_fmtspec = false;
+        default: {
+            break;
         }
     }
-    va_end(args);
+    return what;
+}
+
+void write_signed(std::FILE *stream, std::va_list args, FmtMod mod, int base)
+{
+    switch (mod) 
+    {
+        case FmtMod::is_long: {
+            write_integer(stream, va_arg(args, long), base);
+            break;
+        }
+        case FmtMod::is_long_long: {
+            write_integer(stream, va_arg(args, long long), base);
+            break;
+        }
+        case FmtMod::is_short: // fall-through
+        case FmtMod::is_short_short: // fall-through
+        case FmtMod::is_none: {
+            write_integer(stream, va_arg(args, int), base);
+            break;
+        }
+    }
+}
+
+void write_unsigned(std::FILE *stream, std::va_list args, FmtMod mod, int base)
+{
+    switch (mod)
+    {
+        case FmtMod::is_long: {
+            write_integer(stream, va_arg(args, unsigned long), base);
+            break;
+        }
+        case FmtMod::is_long_long: {
+            write_integer(stream, va_arg(args, unsigned long long), base);
+            break;
+        }
+        case FmtMod::is_short: // fall-through
+        case FmtMod::is_short_short: // fall-through
+        case FmtMod::is_none: {
+            write_integer(stream, va_arg(args, unsigned int), base);
+            break;
+        }
+    }   
 }
