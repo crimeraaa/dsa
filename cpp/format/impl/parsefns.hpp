@@ -1,5 +1,3 @@
-#pragma once
-
 /**
  * @file        parsefns.hpp
  * 
@@ -28,7 +26,7 @@
  * @param   args        Variadic argument list on the stack. Pop as we go!
  * @param   spec        Character directly to the right of `'%'`.
  * 
- * @return  Pointer to the next non-format specifier character in the format string.
+ * @return  Pointer to the last format specifier character for this item.
  */
 const char *parse_fmt(std::FILE *stream, const char *next, std::va_list args, char spec);
 

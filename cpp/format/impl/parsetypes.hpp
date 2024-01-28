@@ -9,7 +9,6 @@ constexpr size_t MAX_BINARY_LENGTH = (CHAR_BIT * sizeof(std::size_t));
 // `constexpr` implies `const` which implies `static` (internal linkage).
 constexpr char g_digitchars[] = "0123456789abcdef";
 
-
 union FmtSigned {
     int i; // `char` and `short` are also promoted to this
     long li;
@@ -40,7 +39,7 @@ union FmtValue {
 };
 
 struct FmtSpec {
-    const char *nextptr; // Pointer to next non-specifier/modifier character.
+    const char *endptr; // Pointer to the last specifier/modifier for this.
     FmtMod mod;
     char tag; // Primary format specifier like `'i'`  in `"%-08lli"`.
 };

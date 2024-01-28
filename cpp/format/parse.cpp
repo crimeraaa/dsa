@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdio> /* Too lazy to reimplement fputc, fputs and friends */
 #include <cwchar> /* std::fputwc, std::fputws */
+#include <type_traits>
 
 #include "parse.h"
 #include "impl/parsetypes.hpp"
@@ -95,35 +96,35 @@ const char *parse_fmt(std::FILE *stream, const char *next, std::va_list args, ch
             break;
         }
     }
-    return what.nextptr;
+    return what.endptr;
 }
 
 FmtSpec parse_mod(const char *next, char ch)
 {
-    // For now, use `nextptr` to peek ahead of `ch` in the format string.
+    // For now, use `endptr` to peek ahead of `ch` in the format string.
     FmtSpec what;
-    what.nextptr = next;
+    what.endptr = next;
     what.mod = FmtMod::is_none;
     what.tag = ch; // If no modifiers found this will stay as-is.
     switch (ch)
     {
         case 'l': {
             what.mod = FmtMod::is_long; 
-            if (*what.nextptr == 'l') {
+            if (*what.endptr == 'l') {
                 what.mod = FmtMod::is_long_long;
-                what.nextptr++;
+                what.endptr++;
             }
             // Remember postfix increment returns the previous value
-            what.tag = *what.nextptr++; 
+            what.tag = *what.endptr++; 
             break;
         }        
         case 'h': {
             what.mod = FmtMod::is_short;
-            if (*what.nextptr == 'h') {
+            if (*what.endptr == 'h') {
                 what.mod = FmtMod::is_short_short;
-                what.nextptr++;
+                what.endptr++;
             }
-            what.tag = *what.nextptr++;
+            what.tag = *what.endptr++;
             break;
         }
         default: {
