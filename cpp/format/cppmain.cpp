@@ -3,8 +3,8 @@
 
 void test_literals()
 {
-    write_stream(stdout, "Hi %s!\n", "mom");
-    write_stream(stdout, "Turn oven to %i degrees.\n", 350);
+    print_format("Hi %s!\n", "mom");
+    print_format("Turn oven to %i degrees.\n", 350);
 }
 
 void test_variables()
@@ -13,9 +13,9 @@ void test_variables()
     int n = -21, i = 13;
     unsigned ui = 14, uo = 0;
     const char *s = "Hi mom!";
-    write_stream(stdout, "char ch = '%c';\nint n = %i, i = %d;\n", ch, n, i);
-    write_stream(stdout, "unsigned ui = %u, uo = %u;\n", ui, uo);
-    write_stream(stdout, "const char *s = \"%s\";\n", s);
+    print_format("char ch = '%c';\nint n = %i, i = %d;\n", ch, n, i);
+    print_format("unsigned ui = %u, uo = %u;\n", ui, uo);
+    print_format("const char *s = \"%s\";\n", s);
 }
 
 int main()

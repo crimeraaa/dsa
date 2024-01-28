@@ -1,19 +1,26 @@
 #pragma once
 
 #include <cassert> /* assert macro */
+#include <cstdarg> /* std::va_list, va_* macros */
 #include <cstdio> /* std::fputc, std::fputs, std::FILE * */
 #include <cstdlib> /* std::abs overloads, std::size_t */
 #include <type_traits> /* std::is_integral, std::is_signed */
 
 #include "parsetypes.hpp"
 
+// Generally speaking, our largest integer types are 64-bits.
+constexpr size_t MAX_BINARY_LENGTH = (CHAR_BIT * sizeof(std::size_t));
+
+// `constexpr` implies `const` which implies `static` (internal linkage).
+constexpr char g_digitchars[] = "0123456789abcdef";
+
 /**
- * @brief   Helper function for the internal loop of `write_integer`.
+ * @brief   Helper function for the internal loop of `write_integer_body`.
  *          This is because we want negative numbers to also reach towards 0.
  *          But since they're negative, they're less than 0.
  */
 template<typename IntT>
-bool write_integer_loop(IntT arg)
+bool print_int_loop(IntT arg)
 {
     if constexpr(std::is_signed<IntT>::value) {
         if (arg < 0) {
@@ -41,7 +48,7 @@ bool write_integer_loop(IntT arg)
  *          being represented in binary and hexadecimal formats.
  */
 template<typename CharT>
-size_t prefix_integer(CharT *buffer, size_t length, bool negative, int base)
+size_t prefix_int(CharT *buffer, size_t length, bool negative, int base)
 {
     CharT prefix;
     switch (base)
@@ -62,7 +69,7 @@ size_t prefix_integer(CharT *buffer, size_t length, bool negative, int base)
             break;
         }
         default: {
-            assert(false && "prefix_integer(): Unknown base!");
+            assert(false && "prefix_int(): Unknown base!");
             return 0;
         }
     }
@@ -94,7 +101,7 @@ CharT *reverse_string(CharT *buffer, size_t length)
 }
 
 template<typename IntT>
-void write_integer(std::FILE *stream, IntT arg, int base = 10)
+void print_int_body(std::FILE *stream, IntT arg, int base = 10)
 {
     static_assert(std::is_integral<IntT>::value, "bruh");
     if (arg == 0) {
@@ -111,16 +118,26 @@ void write_integer(std::FILE *stream, IntT arg, int base = 10)
         }
     }
     // Read the number from right to left, we'll reverse it later.
-    while (write_integer_loop(arg)) {
+    while (print_int_loop(arg)) {
         // Rightmost digit is also index into g_digitchars, but keep it positive
         int indexchar = std::abs(static_cast<int>(arg % base)); 
         buffer[length++] = g_digitchars[indexchar];
         arg /= base;
     }
-    assert(length <= MAX_BINARY_LENGTH && "write_integer(): Too many digits!"); 
-    if (negative) {
-        buffer[length++] = '-';
-    }
+    assert(length <= MAX_BINARY_LENGTH && "print_int_body(): Too many digits!"); 
+    length = prefix_int(buffer, length, negative, base);
     // buffer was 0-initialized so very last slot should be '\0' itself.
     std::fputs(reverse_string(buffer, length), stream);
+}
+
+template<typename IntT>
+void print_int_to(std::FILE *stream, std::va_list args, int base, bool is_signed)
+{
+    using SignedT = typename std::make_signed_t<IntT>;
+    using UnsignedT = typename std::make_unsigned_t<IntT>;
+    if (is_signed) {
+        print_int_body(stream, va_arg(args, SignedT), base);
+    } else {
+        print_int_body(stream, va_arg(args, UnsignedT), base);
+    }
 }

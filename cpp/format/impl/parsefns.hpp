@@ -31,29 +31,31 @@
 const char *parse_fmt(std::FILE *stream, const char *next, std::va_list args, char spec);
 
 /**
- * @brief   Check the current specifier for its modifiers.
+ * @brief   Check the current specifier for its length modifiers.
  * 
  * @param   next    Pointer to 1 past the character directly right of '%'.
  * @param   spec    Current character being parsed, not the same as `*next`.
  * 
- * @return  FmtSpec struct containing information we can use to pretty print.
+ * @return  `FmtParse` struct containing information we can use to pretty print.
  */
-FmtSpec parse_mod(const char *next, char spec);
+FmtParse parse_len(const char *next, char spec);
 
 /**
- * @brief   Calls the appropriate template instantiation of `write_integer`
- *          for one of: `int`, `long` and `long long`.
- *          
- * @note    `char` and `short` are automatically promoted to `int` in
- *          variadic arguments in C.
+ * @brief   Chooses which overload of `print_int_body` to use.
  */
-void write_signed(std::FILE *stream, std::va_list args, FmtMod mod, int base = 10);
+void print_number_to(std::FILE *stream, std::va_list args, const FmtParse &what);
 
-/**
- * @brief   Calls the appropriate template instantiation of `write_integer`
- *          for one of: `unsigned int`, `unsigned long` and `unsigned long long`.
+
+/** 
+ * Both `char` and `wchar_t` are promoted to `int`.
+ * However their signedness is unspecified by the C standard.
  * 
- * @note    `unsigned char` and `unsigned short` are automatically promoted to
- *          `unsinged int` in variadic arguments in C.
+ * @bug     It seems I can't mix `fputwc` and `fputc` in the same stream.
+ *          I wonder what `printf` is doing to make it work then?
  */
-void write_unsigned(std::FILE *stream, std::va_list args, FmtMod mod, int base = 10);
+void print_char_to(std::FILE *stream, std::va_list args, const FmtParse &what);
+/**
+ * See notes for `print_char_to`. I wonder what `printf` is doing to make
+ * mixing of `"%s"` and `"%ls"` in the same stream work.
+ */
+void print_string_to(std::FILE *stream, std::va_list args, const FmtParse &what);

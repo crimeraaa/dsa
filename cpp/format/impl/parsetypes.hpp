@@ -3,12 +3,6 @@
 #include <cstddef> /* std::size_t */
 #include <climits> /* CHAR_BIT macro */
 
-// Generally speaking, our largest integer types are 64-bits.
-constexpr size_t MAX_BINARY_LENGTH = (CHAR_BIT * sizeof(std::size_t));
-
-// `constexpr` implies `const` which implies `static` (internal linkage).
-constexpr char g_digitchars[] = "0123456789abcdef";
-
 union FmtSigned {
     int i; // `char` and `short` are also promoted to this
     long li;
@@ -21,9 +15,9 @@ union FmtUnsigned {
     unsigned long long llu;
 };
 
-enum class FmtMod {
+enum class FmtLen {
     is_none,
-    is_long, // `"%l<spec>"`: long, unsigned long, wchar_t*
+    is_long, // `"%l<spec>"`: long, unsigned long, wchar_t, wchar_t*
     is_long_long, // `"%ll<spec>"`: long long, unsigned long long
     is_short, // `"%h<spec>"`: short, unsigned short
     is_short_short, // `"%hh<spec>"`: unsigned char, mainly used with `"%hhx"`.
@@ -38,8 +32,10 @@ union FmtValue {
     void *ptr; // Raw memory address
 };
 
-struct FmtSpec {
+struct FmtParse {
     const char *endptr; // Pointer to the last specifier/modifier for this.
-    FmtMod mod;
-    char tag; // Primary format specifier like `'i'`  in `"%-08lli"`.
+    FmtLen len;
+    char spec; // Primary format specifier like `'i'`  in `"%-08lli"`.
+    int base; // For integer types only
+    bool is_signed; // For integer types only
 };

@@ -37,22 +37,22 @@ extern "C" {
 #endif /* __GNUC__ */
 
 /** 
- * @brief   My personal implementation of C-style `fprintf`. For fun!
+ * @brief   My personal implementation of C-style `printf`. For fun!
+ *          Writes to C `stdout`.
  *
- * @param   stream      Where the output will go.
  * @param   fmts        Format string with 0/more format specifiers.
  * @param   ...         Arguments to the format string.
  *
  * @note    This is (should be, anyway) C compatible!
  */
-void write_stream(FILE *stream, const char *fmts, ...) check_format(2, 3);
+void print_format(const char *fmts, ...) check_format(1, 2);
 
 /**
  * @brief   My personal implementation of the C standard library's `vfprintf`.
  * 
  * @note    This will call `va_end` on `args`. If you need a copy, make one!
  */
-void write_va_list(FILE *stream, const char *fmts, va_list args) check_format(2, 0);
+void print_args_to(FILE *stream, const char *fmts, va_list args) check_format(2, 0);
 
 #ifdef __cplusplus
 }
