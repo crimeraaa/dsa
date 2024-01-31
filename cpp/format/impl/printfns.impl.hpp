@@ -102,13 +102,18 @@ CharT *reverse_string(CharT *buffer, size_t length)
     return buffer;
 }
 
+/**
+ * @brief   Does the actual work of printing out a number to `stream`.
+ *          Also takes care of dealing with signed, unsigned and negatives.
+ * 
+ * @note    Bases can only be one of: 2, 8, 10 and 16. Anything else is an error.
+ */
 template<typename IntT>
-void print_int_body(std::FILE *stream, IntT arg, int base = 10)
+int print_int_body(std::FILE *stream, IntT arg, int base = 10)
 {
     static_assert(std::is_integral<IntT>::value, "bruh");
     if (arg == 0) {
-        std::fputc('0', stream);
-        return;
+        return std::fputc('0', stream);
     }
     // Extras: 1 for nul char, 1 for dash, 2 for base.
     char buffer[MAX_BINARY_LENGTH + 4] = {0}; 
@@ -122,6 +127,8 @@ void print_int_body(std::FILE *stream, IntT arg, int base = 10)
     // Read the number from right to left, we'll reverse it later.
     while (print_int_loop(arg)) {
         // Rightmost digit is also index into g_digitchars, but keep it positive
+        // Note how we evaluate `arg % base` first in order to avoid truncating
+        // the result when then we cast it to `int`.
         int indexchar = std::abs(static_cast<int>(arg % base)); 
         buffer[length++] = g_digitchars[indexchar];
         arg /= base;
@@ -129,17 +136,24 @@ void print_int_body(std::FILE *stream, IntT arg, int base = 10)
     assert(length <= MAX_BINARY_LENGTH && "print_int_body(): Too many digits!"); 
     length = prefix_int(buffer, length, negative, base);
     // buffer was 0-initialized so very last slot should be '\0' itself.
-    std::fputs(reverse_string(buffer, length), stream);
+    return std::fputs(reverse_string(buffer, length), stream);
 }
 
+/**
+ * @brief   Wrapper around `print_int_body` to call the appropriate overload for
+ *          signed and unsigned variants.
+ * 
+ * @note    You *can* do this in pure C, you'll just have to "instantiate" all 
+ *          the different function variations yourself.
+ */
 template<typename IntT>
-void print_int_to(std::FILE *stream, std::va_list args, int base, bool is_signed)
+int print_int_to(std::FILE *stream, std::va_list args, int base, bool is_signed)
 {
     using SignedT = typename std::make_signed_t<IntT>;
     using UnsignedT = typename std::make_unsigned_t<IntT>;
     if (is_signed) {
-        print_int_body(stream, va_arg(args, SignedT), base);
+        return print_int_body(stream, va_arg(args, SignedT), base);
     } else {
-        print_int_body(stream, va_arg(args, UnsignedT), base);
+        return print_int_body(stream, va_arg(args, UnsignedT), base);
     }
 }

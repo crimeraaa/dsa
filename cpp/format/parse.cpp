@@ -7,10 +7,13 @@
  * 
  * @brief       Actual implementation of `parse.h`'s exposed functions.
  */
+#include <climits> /* MB_LEN_MAX */
 #include <cstdarg> /* va_list and accompaniying functions */
 #include <cstddef> /* std::size_t */
 #include <cstdio> /* std::FILE, std::fputc, std::fputs */
+#include <cstring> /* std::memset */
 #include <cwchar> /* std::fputwc, std::fputws */
+#include <memory> /* std::allocator, std::allocator_traits */
 #include <type_traits> /* std::is_signed */
 
 #include "parse.h"
@@ -18,32 +21,35 @@
 #include "impl/parsefns.hpp"
 #include "impl/printfns.impl.hpp"
 
+/* Error code returned by `wctomb, wcrtomb, wcstombs, wcsrtombs`. */
+constexpr size_t WC_TO_MB_ERROR = static_cast<size_t>(-1);
+
 void print_format(const char *fmts, ...)
 {
     std::va_list args;
     va_start(args, fmts); // args now points to first vararg, whatever it may be
-    return print_args_to(stdout, fmts, args);
+    print_args_to(stdout, fmts, args);
+    va_end(args);
 }
 
 void print_args_to(std::FILE *stream, const char *fmts, std::va_list args)
 {
     const char *ptr = fmts; // Keep track of current character in format string.
-    bool is_fmtspec = false;
+    bool is_spec = false;
     char ch;
     // ptr itself is incremented, but postfix returns the original value
     while ((ch = *ptr++) != '\0') {
         if (ch == '%') {
-            is_fmtspec = true;
+            is_spec = true;
             continue; // Proceed to next token
         }
-        if (!is_fmtspec) {
+        if (!is_spec) {
             std::fputc(ch, stream);
         } else {
             ptr = parse_fmt(stream, ptr, args, ch);
-            is_fmtspec = false;
+            is_spec = false;
         }
     }
-    va_end(args);
 }
 
 const char *parse_fmt(std::FILE *stream, const char *next, std::va_list args, char ch)
@@ -135,38 +141,71 @@ FmtParse parse_len(const char *next, char ch)
     return what;
 }
 
-void print_number_to(std::FILE *stream, std::va_list args, const FmtParse &what)
+int print_number_to(std::FILE *stream, std::va_list args, const FmtParse &what)
 {
+    int base = what.base;
+    bool is_signed = what.is_signed;
     switch (what.len)
     {
         case FmtLen::is_long:
-            print_int_to<long>(stream, args, what.base, what.is_signed);
-            break;
+            return print_int_to<long>(stream, args, base, is_signed);
         case FmtLen::is_long_long:
-            print_int_to<long long>(stream, args, what.base, what.is_signed);
-            break;
+            return print_int_to<long long>(stream, args, base, is_signed);
         case FmtLen::is_short: // fall-through
         case FmtLen::is_short_short: // fall-through
         case FmtLen::is_none:
-            print_int_to<int>(stream, args, what.base, what.is_signed);
-            break;
+            return print_int_to<int>(stream, args, base, is_signed);
     }    
+    return EOF; // Compiler warning, seems to not recognize the limited cases...
 }
 
-void print_char_to(std::FILE *stream, std::va_list args, const FmtParse &what)
+int print_char_to(std::FILE *stream, std::va_list args, const FmtParse &what)
 {
-    if (what.len == FmtLen::is_long) {
-        std::fputwc(va_arg(args, int), stream);
-    } else {
-        std::fputc(va_arg(args, int), stream);
-    }
+    return (what.len == FmtLen::is_long) 
+        ? print_mbchar_to(va_arg(args, int), stream)
+        : std::fputc(va_arg(args, int), stream);
 }
 
-void print_string_to(std::FILE *stream, std::va_list args, const FmtParse &what)
+int print_string_to(std::FILE *stream, std::va_list args, const FmtParse &what)
 {
-    if (what.len == FmtLen::is_long) {
-        std::fputws(va_arg(args, const wchar_t*), stream);
-    } else {
-        std::fputs(va_arg(args, const char*), stream);
+    return (what.len == FmtLen::is_long)
+        ? print_mbstring_to(va_arg(args, const wchar_t *), stream)
+        : std::fputs(va_arg(args, const char *), stream);
+}
+
+int print_mbchar_to(int arg, std::FILE *stream)
+{
+    char mbchar[MB_LEN_MAX] = {0}; // valid for any of this system's encodings
+    mbstate_t mbstate; // shift state
+    std::memset(&mbstate, 0, sizeof(mbstate));
+    if (wcrtomb(mbchar, arg, &mbstate) == WC_TO_MB_ERROR) { // See: man wcrtomb
+        perror("print_wctomb(): Failed to convert a wchar_t!");
+        return EOF;
     }
+    return std::fputs(mbchar, stream);
+}
+
+int print_mbstring_to(const wchar_t *arg, std::FILE *stream)
+{
+    size_t len = std::wcslen(arg) + 1; // +1 for nul char.
+    size_t bytes = sizeof(*arg) * len;
+    mbstate_t mbstate;
+    int ret = EOF; // Return value of `std::fputs`, use `EOF` to signal errors.
+    // operator `new` and `delete` won't link properly in C.
+    char *mbstring = static_cast<char*>(std::malloc(bytes));
+    if (mbstring == nullptr) {
+        perror("Failed to allocate memory for mbstring");
+        goto deinit;
+    }
+    std::memset(&mbstate, 0, sizeof(mbstate));
+    len = std::wcsrtombs(mbstring, &arg, bytes, &mbstate); // Basically `strlen`
+    if (len == WC_TO_MB_ERROR) {
+        perror("wchar_t->char conversion failed");
+        fputs("Is the locale correct? e.g. `setlocale(LC_CTYPE, \"\");\n", stderr);
+        goto deinit;
+    }
+    ret = std::fputs(mbstring, stream);
+deinit:
+    std::free(mbstring);
+    return ret;
 }

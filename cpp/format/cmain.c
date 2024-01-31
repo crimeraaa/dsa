@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <locale.h>
 #include <stdio.h>
 #include <wchar.h>
 #include "parse.h"
@@ -45,25 +46,21 @@ void test_chars(void)
  */
 void test_wchars(void)
 {
-    wchar_t wch = L'X';
-    const wchar_t *wcs = L"Hi mom!";
-    print_format("wchar_t wch = L'%lc';\n", wch);
-    print_format("const wchar_t *wcs = L\"%ls\";\n", wcs);
-    printf("wchar_t wch = L'%lc';\n", wch);
-    printf("const wchar_t *wcs = L\"%ls\";\n", wcs);
-    if (fputwc(L'B', stdout) == WEOF) {
-        perror("fputwc");
-    }
-    if (fputwc(L'\n', stdout) == WEOF) {
-        perror("fputwc");
-    }
-    if (fputws(L"Hi mom!\n", stdout) == -1) {
-        perror("fputws");
-    }
+    wchar_t lc = L'X';
+    const wchar_t *ls = L"Hi mom!";
+    // U+00A1: Iverted Exclamation Point, U+00F1: Latin Small Letter N with Tilde
+    const wchar_t *spanish = L"\u00A1Hola Se\u00F1or y Se\u00F1orita!";
+    print_format("'%lc'\n", lc);
+    print_format("\"%ls\"\n", ls);
+    print_format("\"%ls\"\n", spanish);
 }
 
 int main(void)
 {
+    if (setlocale(LC_CTYPE, "") == NULL) {
+        perror("Failed to set locale to all");
+        return 1;
+    }
     // Positive if wide-char oriented, negative if not, 0 if no orientation.
     // fputwc('\0', stdout);
     print_format("Hi mom!\n");

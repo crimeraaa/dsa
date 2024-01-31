@@ -42,8 +42,10 @@ FmtParse parse_len(const char *next, char spec);
 
 /**
  * @brief   Chooses which overload of `print_int_body` to use.
+ * 
+ * @note    Returns number of raw `char`'s written or `EOF`.
  */
-void print_number_to(std::FILE *stream, std::va_list args, const FmtParse &what);
+int print_number_to(std::FILE *stream, std::va_list args, const FmtParse &what);
 
 
 /** 
@@ -53,9 +55,9 @@ void print_number_to(std::FILE *stream, std::va_list args, const FmtParse &what)
  * @bug     It seems I can't mix `fputwc` and `fputc` in the same stream.
  *          I wonder what `printf` is doing to make it work then?
  */
-void print_char_to(std::FILE *stream, std::va_list args, const FmtParse &what);
+int print_char_to(std::FILE *stream, std::va_list args, const FmtParse &what);
 /**
  * See notes for `print_char_to`. I wonder what `printf` is doing to make
  * mixing of `"%s"` and `"%ls"` in the same stream work.
  */
-void print_string_to(std::FILE *stream, std::va_list args, const FmtParse &what);
+int print_string_to(std::FILE *stream, std::va_list args, const FmtParse &what);

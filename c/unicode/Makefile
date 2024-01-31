@@ -1,9 +1,9 @@
 BIN_DIR = ./bin
 OBJ_DIR = ./obj
 
+C_EXE = $(BIN_DIR)/main
 C_SRC = $(wildcard *.c)
 C_OBJ = $(C_SRC:%.c=$(OBJ_DIR)/%.o)
-C_EXE = $(patsubst %.c, $(BIN_DIR)/%, $(C_SRC))
 
 CFLAGS += $(DEBUGFLAGS)
 

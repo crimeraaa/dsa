@@ -19,6 +19,7 @@ extern "C" {
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <wchar.h>
 
 #ifdef __GNUC__
 /**
@@ -50,9 +51,28 @@ void print_format(const char *fmts, ...) check_format(1, 2);
 /**
  * @brief   My personal implementation of the C standard library's `vfprintf`.
  * 
- * @note    This will call `va_end` on `args`. If you need a copy, make one!
+ * @note    Heavily inspired by GNU libc's implementation!
  */
 void print_args_to(FILE *stream, const char *fmts, va_list args) check_format(2, 0);
+
+/**
+ * @brief   Print a wide character to a narrow stream. Useful for UTF-8.
+ * 
+ *          Converts the wide character `arg` to a `char` buffer then writes
+ *          said buffer to `stream`.
+ * 
+ * @return  Number of raw `char`'s written or `EOF`.
+ */
+int print_mbchar_to(int arg, FILE *stream);
+
+/**
+ * @brief   Print a wide character string to a narrow stream. Useful for UTF-8.
+ * 
+ * @note    Allocates memory for an internal buffer in order to convert `arg`.
+ *          
+ * @return  Number of raw `char`'s written or `EOF`.
+ */
+int print_mbstring_to(const wchar_t *arg, FILE *stream);
 
 #ifdef __cplusplus
 }
