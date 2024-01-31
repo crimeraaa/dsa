@@ -5,16 +5,26 @@
 #include <string.h> /* str* family */
 #include <wchar.h> /* wchar_t, fputw*, fgetw*, putw*, wcs* families*/
 
+/* Error return. See `man wctomb` or one of: `wcrtomb, wcstombs, wcsrtombs` */
+#define WCTOMB_ERROR ((size_t)-1)
+
 /**
  * @brief   When locale is `"en_US.UTF-8"`, we can print `wchar_t` as stored
  *          inside of `char` arrays thanks to `wctomb`!
+ *          
+ * @note    Heavily taken from glibc's implementation of vfprintf:
+ *          https://github.com/lattera/glibc/blob/master/stdio-common/vfprintf.c
  */
 void print_wctomb(wchar_t lc)
 {
-    char ch[MB_LEN_MAX] = {0}; // valid for any of this system's encodings
-    ch[wctomb(ch, lc)] = '\0'; // multibyte unicode string even if only 1 wchar_t
-    printf("wchar_t lc = L'%lc' (len = 1)\n", lc);
-    printf("char ch[%i] = \"%s\" (len = %zu)\n\n", MB_LEN_MAX, ch, strlen(ch));
+    char mbchar[MB_LEN_MAX] = {0}; // valid for any of this system's encodings
+    mbstate_t mbstate = {0}; // shift state
+    size_t len = wcrtomb(mbchar, lc, &mbstate); // Number of bytes written
+    if (len == WCTOMB_ERROR) {
+        perror("print_wctomb(): Failed to convert a wchar_t!");
+        return;
+    }
+    printf("mbchar = %s (strlen = %zu)\n", mbchar, len);
 }
 
 /**
@@ -28,23 +38,22 @@ void print_wctomb(wchar_t lc)
  */
 void print_wcstombs(const wchar_t *ls)
 {
-    size_t n_length = wcslen(ls) + 1; // Add 1 for nul char.
-    size_t n_bytes = sizeof(*ls) * n_length; // Maybe overkill but I'm paranoid
-    char *s = malloc(n_bytes);
-    if (!s) {
-        perror("failed to allocate memory!");
+    size_t len = wcslen(ls) + 1; // Add 1 for nul char.
+    size_t bytes = sizeof(*ls) * len; // Maybe overkill but I'm paranoid
+    mbstate_t mbstate = {0}; // Shift state
+    char *mbstring = malloc(bytes);
+    if (!mbstring) {
+        perror("print_wcstombs(): failed to allocate memory!");
         goto deinit;
     }
-    printf("const wchar_t *ls = L\"%ls\" (len = %zu)\n", ls, n_length);
-    n_length = wcstombs(s, ls, n_bytes); // Also copies over nul char :)
-    if (n_length == (size_t)-1) {
-        perror("failed to convert some wide character!");
+    len = wcsrtombs(mbstring, &ls, bytes, &mbstate); // char-based strlen
+    if (len == WCTOMB_ERROR) {
+        perror("print_wcstombs(): failed to convert 1/more wchar_t's!");
         goto deinit;    
     }
-    printf("char *s = \"%s\" (len = %zu)\n", s, n_length);
-    printf("is correct strlen? %s\n\n", (strlen(s) == n_length) ? "yes" : "no");
+    printf("mbstring = \"%s\" (strlen = %zu)\n", mbstring, len);
 deinit:
-    free(s);
+    free(mbstring);
 }
 
 int main(void)
