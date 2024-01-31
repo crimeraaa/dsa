@@ -1,17 +1,19 @@
 #pragma once
 
 #include <cassert> /* assert macro */
+#include <climits> /* CHAR_BIT macro */
 #include <cstdarg> /* std::va_list, va_* macros */
+#include <cstddef> /* std::size_t */
 #include <cstdio> /* std::fputc, std::fputs, std::FILE * */
 #include <cstdlib> /* std::abs overloads, std::size_t */
 #include <type_traits> /* std::is_integral, std::is_signed */
 
 #include "parsetypes.hpp"
 
-// Generally speaking, our largest integer types are 64-bits.
+/* Generally speaking, our largest integer types are 64-bits. */
 constexpr size_t MAX_BINARY_LENGTH = (CHAR_BIT * sizeof(std::size_t));
 
-// `constexpr` implies `const` which implies `static` (internal linkage).
+/* `constexpr` implies `const` which implies `static` (internal linkage). */
 constexpr char g_digitchars[] = "0123456789abcdef";
 
 /**

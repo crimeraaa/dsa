@@ -1,35 +1,29 @@
 #pragma once
 
-#include <cstddef> /* std::size_t */
-#include <climits> /* CHAR_BIT macro */
-
-union FmtSigned {
-    int i; // `char` and `short` are also promoted to this
-    long li;
-    long long lli;
-};
-
-union FmtUnsigned {
-    unsigned int u; // `unsigned char` and `unsigned short` get promoted to this
-    unsigned long lu;
-    unsigned long long llu;
-};
-
 enum class FmtLen {
     is_none,
-    is_long, // `"%l<spec>"`: long, unsigned long, wchar_t, wchar_t*
-    is_long_long, // `"%ll<spec>"`: long long, unsigned long long
-    is_short, // `"%h<spec>"`: short, unsigned short
+    is_long,        // `"%l<spec>"` : long, unsigned long, wchar_t, wchar_t*
+    is_long_long,   // `"%ll<spec>"`: long long, unsigned long long
+    is_short,       // `"%h<spec>"` : short, unsigned short
     is_short_short, // `"%hh<spec>"`: unsigned char, mainly used with `"%hhx"`.
 };
 
+/**
+ * Not sure what I'd use this for at the moment. This is meant to represent
+ * most possible variables under the C printf format specifiers.
+ */
 union FmtValue {
-    FmtSigned si;
-    FmtUnsigned ui;
-    double df; // `float` is also promoted to this
-    char *cs; 
-    wchar_t *wcs;
-    void *ptr; // Raw memory address
+    int i; // automatic promotion of char/wchar_t (signedness not guaranteed)
+    long li;
+    long long lli;
+    unsigned int u; // automatic promotion of unsigned char/wchar_t.
+    unsigned long lu;
+    unsigned long long llu;
+    char *s;
+    wchar_t *ls;
+    double f; // `%lf` is redundant as `float` is always promoted to `double`.
+    long double Lf; // `%llf` is a GNU extension.
+    void *p;
 };
 
 struct FmtParse {
