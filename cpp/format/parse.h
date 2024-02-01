@@ -39,7 +39,7 @@ extern "C" {
 
 /** 
  * @brief   My personal implementation of C-style `printf`. For fun!
- *          Writes to C `stdout`.
+ *          Writes to C `stdout`, assuming a narrow-stream orientation.
  *
  * @param   fmts        Format string with 0/more format specifiers.
  * @param   ...         Arguments to the format string.

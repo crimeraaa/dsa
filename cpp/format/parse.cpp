@@ -4,8 +4,13 @@
  * @author      crimeraaa
  *
  * @date        27 January 2024
- * 
+ *
  * @brief       Actual implementation of `parse.h`'s exposed functions.
+ *              Do note that I'm trying to limit dependencies on `libstdc++`,
+ *              so I opt not to call operators `new` and `delete` here.
+ * 
+ *              That *should* allow `gcc` to link to the resulting object file
+ *              just fine.
  */
 #include <climits> /* MB_LEN_MAX */
 #include <cstdarg> /* va_list and accompaniying functions */
@@ -19,7 +24,7 @@
 #include "parse.h"
 #include "impl/parsetypes.hpp"
 #include "impl/parsefns.hpp"
-#include "impl/printfns.impl.hpp"
+#include "impl/printfns.tpl.hpp"
 
 /* Error code returned by `wctomb, wcrtomb, wcstombs, wcsrtombs`. */
 constexpr size_t WC_TO_MB_ERROR = static_cast<size_t>(-1);
@@ -116,15 +121,15 @@ FmtParse parse_len(const char *next, char ch)
     switch (ch)
     {
         case 'l': {
-            what.len = FmtLen::is_long; 
+            what.len = FmtLen::is_long;
             if (*what.endptr == 'l') {
                 what.len = FmtLen::is_long_long;
                 what.endptr++;
             }
             // Remember postfix increment returns the previous value.
-            what.spec = *what.endptr++; 
+            what.spec = *what.endptr++;
             break;
-        }        
+        }
         case 'h': {
             what.len = FmtLen::is_short;
             if (*what.endptr == 'h') {
@@ -155,13 +160,13 @@ int print_number_to(std::FILE *stream, std::va_list args, const FmtParse &what)
         case FmtLen::is_short_short: // fall-through
         case FmtLen::is_none:
             return print_int_to<int>(stream, args, base, is_signed);
-    }    
+    }
     return EOF; // Compiler warning, seems to not recognize the limited cases...
 }
 
 int print_char_to(std::FILE *stream, std::va_list args, const FmtParse &what)
 {
-    return (what.len == FmtLen::is_long) 
+    return (what.len == FmtLen::is_long)
         ? print_mbchar_to(va_arg(args, int), stream)
         : std::fputc(va_arg(args, int), stream);
 }
@@ -188,7 +193,7 @@ int print_mbchar_to(int arg, std::FILE *stream)
 int print_mbstring_to(const wchar_t *arg, std::FILE *stream)
 {
     size_t len = std::wcslen(arg) + 1; // +1 for nul char.
-    size_t bytes = sizeof(*arg) * len;
+    size_t bytes = MB_LEN_MAX * len; // Overkill but I am hella paranoid
     mbstate_t mbstate;
     int ret = EOF; // Return value of `std::fputs`, use `EOF` to signal errors.
     // operator `new` and `delete` won't link properly in C.
