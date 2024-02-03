@@ -1,6 +1,6 @@
 #include <stddef.h>
 #include <stdio.h>
-#include "ga_array.h"
+#include "array.h"
 
 void ga_print(const ga_array *self)
 {
@@ -15,7 +15,7 @@ void ga_print(const ga_array *self)
         self->capacity);
     printf("Total usage: %zu bytes\n", self->info->size * self->capacity);
     for (size_t i = 0; i < self->count; i++) {
-        // Because ga_TypeInfo is only available at runtime, no way we can
+        // Because ti_typeinfo is only available at runtime, no way we can
         // emulate the C++11 keyword `auto`.
         const int *pi = ga_retrieve(self, i);
         printf("self[%zu] = %i (& = %p)\n", i, (pi) ? *pi : -1, (void*)pi); 
@@ -25,7 +25,7 @@ void ga_print(const ga_array *self)
 int main(void)
 {
     // Order of operations for `&`: https://stackoverflow.com/a/40167118
-    ga_array ga = ga_init(0, &(ga_fundtypes.i[GA_TYPELENGTH_NONE]));
+    ga_array ga = ga_init(0, ti_query('i', TI_LENGTH_NONE));
     ga_array *p = &ga;
     int i = 13;
     int ii = 45;

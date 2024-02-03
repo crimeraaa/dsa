@@ -1,15 +1,17 @@
-EXE = main
-
 CC ?= gcc
 CFLAGS ?= -O0 -std=c11 -Wall -Wextra -Werror -Wshadow -pedantic
 CFLAGS += $(DEBUGFLAGS) # See ~/.config/dotfiles/config.gcc.mk
+
+EXE = main
+SRC = $(wildcard *.c)
+OBJ = $(patsubst %.c, obj/%.o, $(SRC))
 
 all: bin/$(EXE)
 	
 bin obj:
 	$(MKDIR) $@
 
-bin/$(EXE): obj/$(EXE).o obj/ga_array.o | bin
+bin/$(EXE): $(OBJ) | bin
 	$(CC) $(CFLAGS) -o $@ $^
 	
 obj/%.o: %.c | obj
