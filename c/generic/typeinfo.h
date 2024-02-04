@@ -12,8 +12,17 @@ extern "C" {
 #include <stddef.h>     /* size_t */
 #include <wchar.h>      /* wchar_t, WCHAR_MIN */
 
-typedef void ti_copyfn(void *dst, const void *src);
-typedef void ti_movefn(void *dst, void *src);
+typedef void *ti_initfn(void *dst);
+typedef void *ti_copyfn(void *dst, const void *src);
+typedef void *ti_movefn(void *dst, void *src);
+typedef void ti_deinitfn(void *dst);
+
+typedef struct ti_typefns {
+    ti_initfn *init; // C++ style Constructor. What's this type's defaults?
+    ti_copyfn *copy; // C++ style Copy-constructor.
+    ti_movefn *move; // C++ style Move-constructor. 
+    ti_deinitfn *deinit; // C++ style Destructor. How do we clean up this type?
+} ti_typefns;
 
 typedef enum ti_typelength {
     TI_LENGTH_NONE,
@@ -25,29 +34,20 @@ typedef enum ti_typelength {
     TI_LENGTH_COUNT,  // Total length of the lookup table.
 } ti_typelength;
 
-/** 
- * We don't actually use this to avoid implicit conversion to `ti_typelength`.
- * Rather, this is just to gauge how many character type modifiers there are.
- */
-typedef enum ti_chartype {
-    TI_CHAR_NARROW,
-    TI_CHAR_WIDE,
-    TI_CHAR_COUNT
-} ti_chartype;
-
 typedef struct ti_typeinfo {
     size_t size; // `sizeof` for this type.
-    ti_typelength length;
+    const ti_typefns *fnlist; // Basic functions for manipulating our datatype.
+    ti_typelength length; // What's our length modifier? e.g. `long` or `short`.
     char spec; // One of: `c`, `i`, `u`, `f`, `s`, `p` ala `printf`.
-    bool sign; // Is this a signed integer type?
-    bool fund; // Is this a fundamental type?
+    bool is_signed; // Is this a signed integer type?
+    bool is_fundamental;
 } ti_typeinfo; 
 
 typedef struct ti_lookup {
     const ti_typeinfo i[TI_LENGTH_COUNT]; // Signed integer types.
     const ti_typeinfo u[TI_LENGTH_COUNT]; // Unsigned integer types.
-    const ti_typeinfo c[TI_CHAR_COUNT];   // Narrow and wide character types.
-    const ti_typeinfo s[TI_CHAR_COUNT];   // Narrow and wide character types.
+    const ti_typeinfo c[TI_LENGTH_COUNT]; // Narrow and wide character types.
+    const ti_typeinfo s[TI_LENGTH_COUNT]; // Narrow and wide character types.
     const ti_typeinfo p; // Void pointers, opaque pointers, etc.
 } ti_lookup;
 
@@ -60,6 +60,15 @@ typedef struct ti_lookup {
  */
 extern const ti_lookup ti_fundtypes;
 
+/**
+ * @brief   Helper function to make querying `ti_fundtypes` easier.
+ * 
+ * @param   spec    One of `i`, `u`, `c`, `s` or `p`. Think `printf` specifiers.
+ * @param   len     A `TI_LENGTH_*` enum value.
+ * 
+ * @note    For `p`, you can pass any `TI_LENGTH_*` macro as there is only 1 entry
+ *          for it.
+ */
 const ti_typeinfo *ti_query(char spec, ti_typelength len);
 
 #ifdef __cplusplus
