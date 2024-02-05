@@ -2,9 +2,58 @@
 #include <stdio.h>
 #include "array.h"
 
-struct TI_Test {
+typedef struct TI_Test {
     char key;
     int value;
+} TI_Test;
+
+static inline TI_Test *ttest_init(TI_Test *self)
+{
+    // Remember NULL/nullptr (usually) is 0, and 0 in C is false.
+    if (self) {
+        self->key = 0;
+        self->value = 0;
+    }
+    return self;
+}
+
+TI_Test *ttest_copy(TI_Test *self, const TI_Test *other)
+{
+    self->key = other->key;
+    self->value = other->value;
+    return self;
+}
+
+TI_Test *ttest_move(TI_Test *self, TI_Test *other)
+{
+    self->key = other->key;
+    self->value = other->value;
+    other->key = 0;
+    other->value = 0;
+    return self;
+}
+
+void ttest_deinit(TI_Test *self)
+{
+    self->key = 0;
+    self->value = 0;
+}
+
+/** 
+ * These casts are allowed because the internal function pointers are called
+ * only by implementation functions, which in turn only call them in the forms:
+ * ```cpp
+ * void self->info->fnlist->init(void *dst);
+ * void self->info->fnlist->copy(void *dst, const void *src);
+ * void self->info->fnlist->move(void *dst, void *src);
+ * void self->info->fnlist->deinit(void *dst);
+ * ```
+ */
+const ti_typefns ttest_fns = {
+    .init   = (ti_initfn*)   &ttest_init,
+    .copy   = (ti_copyfn*)   &ttest_copy,
+    .move   = (ti_movefn*)   &ttest_move,
+    .deinit = (ti_deinitfn*) &ttest_deinit,
 };
 
 void ga_print(const ga_array *self)
@@ -44,6 +93,11 @@ void test_pointer_ti(void)
     printf("before: p = %p\n", p);
     ti->fnlist->copy(&p, &ti);
     printf("after: p = %p\n", p);
+}
+
+void test_TI_Test_array(void)
+{
+    ga_array ga = ga_init(0, &ttest_fns);
 }
 
 int main(void)
