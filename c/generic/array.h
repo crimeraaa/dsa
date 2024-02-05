@@ -5,11 +5,8 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#include <limits.h>     /* SCHAR_MIN */
 #include <stdbool.h>    /* bool */
 #include <stdlib.h>     /* size_t, malloc, free */
-#include <stdio.h>      /* perror */
-#include <wchar.h>      /* wchar_t */
     
 #include "typeinfo.h"
 
@@ -26,7 +23,7 @@ typedef struct ga_array {
  * @brief   Start up a new instance of `ga_array`!
  * 
  * @param   count   How many elements should the array hold at first?
- * @param   info    What information do we need to know about this type?
+ * @param   info    What information/functions do we need to know about this type?
  * 
  * @note    Most fundamental types are already accounted for and have their own
  *          pre-defined `ti_typeinfo`. See the `ti_query` function and its usage.

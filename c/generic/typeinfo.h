@@ -3,9 +3,9 @@
 
 #ifdef __cplusplus
 extern "C" {
-#else 
+#else  /* __cplusplus not defined, */
 #define nullptr NULL
-#endif
+#endif /* __cplusplus */
     
 #include <limits.h>     /* CHAR_MIN, SCHAR_MIN */
 #include <stdbool.h>    /* bool */
@@ -19,8 +19,8 @@ typedef void ti_deinitfn(void *dst);
 
 typedef struct ti_typefns {
     ti_initfn *init; // C++ style Constructor. What's this type's defaults?
-    ti_copyfn *copy; // C++ style Copy-constructor.
-    ti_movefn *move; // C++ style Move-constructor. 
+    ti_copyfn *copy; // C++ style Copy semantics for shallow or deep copying.
+    ti_movefn *move; // C++ style Move semantics for ownership and lifetimes.
     ti_deinitfn *deinit; // C++ style Destructor. How do we clean up this type?
 } ti_typefns;
 
@@ -43,13 +43,13 @@ typedef struct ti_typeinfo {
     bool is_fundamental;
 } ti_typeinfo; 
 
-typedef struct ti_lookup {
+typedef struct ti_typelookup {
     const ti_typeinfo i[TI_LENGTH_COUNT]; // Signed integer types.
     const ti_typeinfo u[TI_LENGTH_COUNT]; // Unsigned integer types.
     const ti_typeinfo c[TI_LENGTH_COUNT]; // Narrow and wide character types.
     const ti_typeinfo s[TI_LENGTH_COUNT]; // Narrow and wide character types.
     const ti_typeinfo p; // Void pointers, opaque pointers, etc.
-} ti_lookup;
+} ti_typelookup;
 
 /**
  * Query the member that closely resembles your fundamental-type, then
@@ -58,7 +58,7 @@ typedef struct ti_lookup {
  * Indexing using number literals won't result in a compile error, but do so
  * at your own risk!!!
  */
-extern const ti_lookup ti_fundtypes;
+extern const ti_typelookup ti_fundtypes;
 
 /**
  * @brief   Helper function to make querying `ti_fundtypes` easier.

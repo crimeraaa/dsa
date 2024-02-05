@@ -51,10 +51,10 @@ int main(void)
     // Order of operations for `&`: https://stackoverflow.com/a/40167118
     ga_array ga = ga_init(0, ti_query('i', TI_LENGTH_NONE));
     ga_array *p = &ga;
-    int i = 13;
-    int ii = 45;
-    ga_push_back(p, &i);
-    ga_push_back(p, &ii);
+    for (int i = 0; i < 16; i++) {
+        int x = rand() % 0xFF;
+        ga_push_back(p, &x);
+    }
     ga_print(p);
     ga_deinit(p);
     (void)ga;

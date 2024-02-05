@@ -46,8 +46,9 @@ bool ga_resize(ga_array *self, size_t newcapacity)
     if (newcapacity < self->capacity) {
         self->count = newcapacity;
     }
-    self->capacity = newcapacity;
-    ga_byte *tmp = realloc(self->rawbytes, self->info->size * newcapacity);
+    self->capacity = newcapacity; // Update only after determining new counter.
+    size_t rawsize = self->info->size * newcapacity;
+    ga_byte *tmp = realloc(self->rawbytes, rawsize);
     if (tmp == nullptr) {
         lg_perror("ga_resize", "realloc buffer failed");
         return false;
