@@ -2,12 +2,18 @@
 #include <stdio.h>
 #include "array.h"
 
-typedef struct TI_Test {
+typedef struct sample_t {
     char key;
     int value;
-} TI_Test;
+} sample_t;
 
-static inline TI_Test *ttest_init(TI_Test *self)
+void st_print(const sample_t *self)
+{
+    const void *p = self;
+    printf("\t%p: {.key = %c, .value = %i}\n", p, self->key, self->value);
+}
+
+sample_t *st_init(sample_t *self)
 {
     // Remember NULL/nullptr (usually) is 0, and 0 in C is false.
     if (self) {
@@ -17,26 +23,23 @@ static inline TI_Test *ttest_init(TI_Test *self)
     return self;
 }
 
-TI_Test *ttest_copy(TI_Test *self, const TI_Test *other)
+sample_t *st_copy(sample_t *self, const sample_t *other)
 {
     self->key = other->key;
     self->value = other->value;
     return self;
 }
 
-TI_Test *ttest_move(TI_Test *self, TI_Test *other)
+sample_t *st_move(sample_t *self, sample_t *other)
 {
-    self->key = other->key;
-    self->value = other->value;
-    other->key = 0;
-    other->value = 0;
+    self = st_copy(self, other);
+    other = st_init(other);
     return self;
 }
 
-void ttest_deinit(TI_Test *self)
+void st_deinit(sample_t *self)
 {
-    self->key = 0;
-    self->value = 0;
+    self = st_init(self);
 }
 
 /** 
@@ -49,11 +52,20 @@ void ttest_deinit(TI_Test *self)
  * void self->info->fnlist->deinit(void *dst);
  * ```
  */
-const ti_typefns ttest_fns = {
-    .init   = (ti_initfn*)   &ttest_init,
-    .copy   = (ti_copyfn*)   &ttest_copy,
-    .move   = (ti_movefn*)   &ttest_move,
-    .deinit = (ti_deinitfn*) &ttest_deinit,
+const ti_typefns st_fns = {
+    .init   = (ti_initfn*)   &st_init,
+    .copy   = (ti_copyfn*)   &st_copy,
+    .move   = (ti_movefn*)   &st_move,
+    .deinit = (ti_deinitfn*) &st_deinit,
+};
+
+const ti_typeinfo st_info = {
+    .size = sizeof(sample_t),
+    .fnlist = &st_fns,
+    .length = TI_LENGTH_NONE,
+    .spec = '0',
+    .is_signed = false,
+    .is_fundamental = false,
 };
 
 void ga_print(const ga_array *self)
@@ -95,9 +107,46 @@ void test_pointer_ti(void)
     printf("after: p = %p\n", p);
 }
 
-void test_TI_Test_array(void)
+void st_array(void)
 {
-    ga_array ga = ga_init(0, &ttest_fns);
+    ga_array ga = ga_init(0, &st_info);
+    ga_array *self = &ga;
+    for (int i = 0; i < 16; i++) {
+        // Getting the addresses of literals was introduced in C11 I believe.
+        ga_push_back(self, &(sample_t){
+            .key = 'a' + i, 
+            .value = rand() % 0xFF
+        });
+    }
+    for (size_t i = 0; i < self->count; i++) {
+        st_print(ga_rawretrieve(self, i));
+    }
+    ga_deinit(self);
+}
+
+/* More accurately, copying exact pointers over. */
+void string_array(void)
+{
+    static const char *strings[] = {
+        "Hi mom!",
+        "Hello there.",
+        "The quick brown fox jumps over the lazy dog",
+        "She sells sea shells by the seashore..."
+    };
+    static const size_t count = sizeof(strings) / sizeof(strings[0]);
+    // 1D Array of pointers to the pointers in `strings`.
+    ga_array ga = ga_init(count, ti_query('s', TI_LENGTH_NONE));
+    ga_array *self = &ga;
+    for (size_t i = 0; i < count; i++) {
+        // Just copying pointers to readonly stack-allocated strings.
+        ga_push_back(self, &strings[i]); 
+    }
+    for (size_t i = 0; i < self->count; i++) {
+        const char **string = ga_retrieve(self, i);
+        printf("self[%zu]: \"%s\"\n", i, *string);
+    }
+    printf("Usage: %zu bytes.\n", self->info->size * self->capacity);
+    ga_deinit(self);
 }
 
 int main(void)
@@ -106,13 +155,14 @@ int main(void)
     ga_array ga = ga_init(0, ti_query('i', TI_LENGTH_NONE));
     ga_array *p = &ga;
     for (int i = 0; i < 16; i++) {
-        int x = rand() % 0xFF;
-        ga_push_back(p, &x);
+        // This address-of-literal syntax was introduced in C11.
+        ga_push_back(p, &(int){rand() % 0xFF});
     }
     ga_print(p);
     ga_deinit(p);
-    (void)ga;
     test_integer_ti();
     test_pointer_ti();
+    st_array();
+    string_array();
     return 0;
 }

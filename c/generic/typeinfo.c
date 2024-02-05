@@ -25,13 +25,13 @@ static void *copy_##K(void *dst, const void *src) \
 } \
 static void *move_##K(void *dst, void *src) \
 { \
-    *(T*)dst = *(T*)src; \
-    *(T*)src = (T){0}; \
+    dst = copy_##K(dst, src); \
+    src = init_##K(src); /* 0-initializes `src`, effectively resetting it. */ \
     return dst; \
 } \
 static void deinit_##K(void *dst) \
 { \
-    *(T*)dst = (T){0}; \
+    dst = init_##K(dst); /* 0-initializes `dst`, effectively resetting it. */ \
 } \
 const ti_typefns fnlist_##K = { \
     .init = init_##K, \
@@ -55,6 +55,11 @@ const ti_typefns fnlist_##K = { \
     callback(, char) \
     callback(l, wchar_t)
 
+/** 
+ * K can be empty (and it's the start of the token anyway). We don't use `##`.
+ * This is because `##` can't properly expand empty arguments!
+ * We use this mainly for `callback(, int)` and `callback(, char)`.
+ */
 #define signedfns(K, T)     generate_data(K##i, signed T)
 #define unsignedfns(K, T)   generate_data(K##u, unsigned T)
 #define charfns(K, T)       generate_data(K##c, T)
