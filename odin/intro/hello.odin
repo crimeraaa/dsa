@@ -7,11 +7,12 @@ import "core:fmt"
 
 // This is the entry point, similar to C, but only for this package.
 main :: proc() {
-    test_strings_and_literals()
-    print_fibonacci(10)
-    name := get_string("Enter your name: ")
+    // test_strings_and_literals()
+    // print_fibonacci(10)
+    name := super_get_string("Enter your name: ")
     defer delete(name) // Was allocated by `get_string`!
-    fmt.printf("Hi %s!\n", name)
+
+    fmt.printf("Hi %s! (len = %i)\n", name, len(name))
 }
 
 // Allow us to store either a character literal (a `rune`) OR a UTF-8 string.
@@ -39,7 +40,7 @@ print_string :: proc(ident: rune, value: C_Str) {
         case string: output = fmt.aprintf("\"%s\", len = %i", v, len(v))
         case rune:   output = fmt.aprintf("\'%c\', len = %i", v, 1)
     }
-    fmt.println("%s\n", output)
+    fmt.println(output)
     // Frees backing memory of a value associate with our string
     // That was allocated by `context.allocator`.
     // See: https://odin-lang.org/docs/overview/#implicit-context-system
