@@ -4,9 +4,9 @@ import "core:fmt"
 import "../cs50"
 
 main :: proc() {
-    defer cs50.clear_allocations()
-    file := cs50.readfile("./sample.txt")
-    for line, index in file {
+    defer cs50.deinit()
+    fv := cs50.get_file_view("./sample.txt")
+    for line, index in fv.lines {
         fmt.println("Ln", index + 1, ":", line)
     }
     name := cs50.get_string("Where are we? ")
