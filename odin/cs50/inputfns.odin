@@ -77,10 +77,9 @@ memory via `cs50.stdin` and `cs50.stored`.
 
 If you want to manage the memory yourself you'll have to use `strings.clone`.
  */
-@(require_results)
 get_string :: proc(format: string, args: ..any) -> string {
     fmt.printf(format, ..args)
-    input := readline(&stdin.reader)
+    input, _ := readline(&stdin.reader)
     return stored_push(input)
 }
 
@@ -96,12 +95,11 @@ See `cs50.get_string` for more detailed information.
 
 Invalid strings have their memory freed during the loop, to reduce memory wastage.
  */
- @(require_results)
 get_int :: proc(format: string, args: ..any) -> int {
     for {
         value, ok := strconv.parse_int(get_string(format, ..args))
         if ok do return value
-        stored_pop_io_string() // User won't be able to use this line of text anyway
+        stored_pop_io_string() 
     }
 }
 
@@ -117,7 +115,6 @@ See `cs50.get_string` for more detailed information.
 
 Invalid strings have their memory freed during the loop, to reduce memory wastage.
  */
- @(require_results)
 get_float :: proc(format: string, args: ..any) -> f64 {
     for {
         value, ok := strconv.parse_f64(get_string(format, ..args))
@@ -137,66 +134,53 @@ If you want to manage the memory of the string array, just call `readfile` as is
 
 You'll have to free all elements of the array along with the array itself.
  */
-@(require_results)
 get_file_view :: proc(file_path: string) -> File_View {
     file_view, _ := readfile(file_path)
     return stored_push(file_view)
 }
 
 @(require_results)
-readline :: proc(reader: ^bufio.Reader) -> string {
-    output: string
-    for {
-        line, err := bufio.reader_read_string(reader, '\n'); 
-        if err != nil && err != io.Error.None {
-            break
-        }
-        defer delete(line)
-        output = strings.concatenate({output, line})
-        if strings.contains_any(output, "\r\n") {
-            output = strings.trim_right(output, "\r\n")
-            break
-        }
-    }
-    return output
+readline :: proc {
+    readline_from_handle,
+    readline_from_reader,
 }
 
 /* 
 #### Brief:
 This is the iterator approach.
 
+#### Returns:
+A heap-allocated 
+
 #### Links:
 <https://odin-lang.org/news/read-a-file-line-by-line/>
  */
-readline_from_handle :: proc(handle: os.Handle) -> string {
+readline_from_handle :: proc(handle: os.Handle) -> (string, bool) {
     data, ok := os.read_entire_file(handle)
     if !ok {
-        return ""
+        return "", false
     }
     defer delete(data)
     contents := string(data)
-    return strings.clone(contents) // `contents` itself will go out of scope!
+    line, err := strings.clone(contents)
+    ok = true if err == nil else false
+    return line, ok
 }
 
 /* 
 #### Brief:
 This is the buffered IO approach.
  */
-readline_from_reader :: proc(reader: ^bufio.Reader) -> string {
-    final: string
-    for {
-        line, err := bufio.reader_read_string(reader, '\n')
-        if err != nil && err != io.Error.None {
-            break
-        }
-        defer delete(line)
-        final = strings.concatenate({final, line})
-        if strings.contains_any(final, "\r\n") {
-            final = strings.trim_right(final, "\r\n")
-            break
-        }
+ @(require_results)
+readline_from_reader :: proc(reader: ^bufio.Reader) -> (string, bool) {
+    line, err := bufio.reader_read_string(reader, '\n'); 
+    // Based on source from `reader.odin`, `err` here can never be `nil`.
+    if err != io.Error.None && err != io.Error.EOF {
+        typestring := type_info_of(type_of(reader))
+        fmt.eprintf("Failed reading line from %v! io.Error: %i\n", typestring, err)
+        return line, false
     }
-    return final
+    return line, true
 }
 
 /* 
