@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:io"
 import "core:os"
 import "core:strings"
+import "core:strconv"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -78,6 +79,28 @@ get_rune :: proc(format: string, args: ..any) -> (letter: rune) {
         if strings.rune_count(dummy) == 1 {
             letter = utf8.rune_at_pos(dummy, 0)
             return
+        }
+    }
+}
+
+get_int :: proc(format: string, args: ..any) -> int {
+    for {
+        line := get_string(format, ..args)
+        defer delete(line)
+        value, ok := strconv.parse_int(line)
+        if ok {
+            return value
+        }
+    }
+}
+
+get_float :: proc(format: string, args: ..any) -> f64 {
+    for {
+        line := get_string(format, ..args)
+        defer delete(line)
+        value, ok := strconv.parse_f64(line)
+        if ok {
+            return value
         }
     }
 }

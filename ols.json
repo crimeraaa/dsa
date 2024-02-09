@@ -4,6 +4,10 @@
         {
             "name": "core",
             "path": "/home/crimeraaa/source-code/Odin/core"
+        },
+        {
+            "name": "shared",
+            "path": "/home/crimeraaa/repos/dsa/odin/shared"
         }
     ],
     "enable_format": false,

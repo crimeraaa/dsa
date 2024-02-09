@@ -7,7 +7,7 @@ import "core:math/rand"
 FILE_NAMES: []string = {"./sample.txt", "./invalid.txt"}
 
 /* view memory usage with `valgrind` */
-main :: proc() {
+old_main :: proc() {
     defer delete(os.args)
     if len(os.args) != 2 && len(os.args) != 3 {
         print_usage()
