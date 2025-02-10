@@ -29,9 +29,6 @@ NIL_ALLOCATOR;
 void
 mem_free(void *ptr, size_t size, Allocator allocator);
 
-__attribute__((
-    __malloc__ (mem_free),
-    __warn_unused_result__))
 void *
 mem_new(size_t size, size_t align, Allocator allocator);
 
@@ -39,19 +36,12 @@ mem_new(size_t size, size_t align, Allocator allocator);
 
 //=== ARRAY MEMORY FUNCTIONS =============================================== {{{
 
-__attribute__((__copy__ (mem_free)))
 void
 mem_delete(void *ptr, size_t count, size_t size, Allocator allocator);
 
-__attribute__((
-    __malloc__ (mem_delete),
-    __warn_unused_result__))
 void *
 mem_make(size_t count, size_t size, size_t align, Allocator allocator);
 
-__attribute__((
-    __malloc__ (mem_delete, 1),
-    __warn_unused_result__))
 void *
 mem_resize(void *old_ptr, size_t old_count, size_t new_count, size_t size, size_t align, Allocator allocator);
 
@@ -59,15 +49,12 @@ mem_resize(void *old_ptr, size_t old_count, size_t new_count, size_t size, size_
 
 //=== RAW MEMORY FUNCTIONS === ============================================= {{{
 
-__attribute__((__copy__ (mem_delete)))
 void
 mem_rawfree(void *ptr, size_t size, Allocator allocator);
 
-__attribute__((__warn_unused_result__))
 void *
 mem_rawnew(size_t size, size_t align, Allocator allocator);
 
-__attribute__((__copy__ (mem_rawnew)))
 void *
 mem_rawresize(void *old_ptr, size_t old_size, size_t new_size, size_t align, Allocator allocator);
 

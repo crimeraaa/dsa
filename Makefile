@@ -1,5 +1,5 @@
 CC := gcc
-CC_FLAGS := -std=c11 -Wall -Wextra -Wconversion -fanalyzer -g -O0
+CC_FLAGS := -std=c11 -Wall -Wextra -Wconversion -fsanitize=address -g -O0
 
 SRC := $(wildcard *.c)
 HDR := $(wildcard *.h)

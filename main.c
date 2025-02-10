@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "allocator.h"
 #include "strings.h"
+#include "intern.h"
 
 typedef struct {
     String *strings;
@@ -13,26 +15,31 @@ typedef struct {
 #define printfln(fmt, ...)  printf(fmt "\n", __VA_ARGS__)
 #define println(msg)        printfln("%s", msg)
 
+static void
+run_interactive(Intern *intern)
+{
+    char buf[BUFSIZ];
+    for (;;) {
+        fputs(">>> ", stdout);
+        if (!fgets(buf, cast(int)sizeof(buf), stdin)) {
+            fputc('\n', stdout);
+            break;
+        }
+        int len = cast(int)strcspn(buf, "\r\n");
+        buf[len] = '\0';
+        String key = {buf, len};
+        String interned = intern_get(intern, key);
+        printfln(STRING_QFMTSPEC " @ %p", expand(interned), cast(void *)interned.data);
+    }
+}
+
 int
 main(int argc, char *argv[])
 {
-    Args args;
-    args.strings = mem_make(String, cast(size_t)argc, HEAP_ALLOCATOR);
-    args.len     = argc;
-    for (int i = 0; i < args.len; i++) {
-        args.strings[i] = string_from_cstring(argv[i]);
-    }
-    
-    for (int i = 0; i < args.len; i++) {
-        String arg = args.strings[i];
-        printf("[%i]: " STRING_QFMTSPEC " => ", i, arg.len, arg.data);
-        for (String state = arg, it; string_split_iterator(&state, ' ', &it);) {
-            printf(STRING_QFMTSPEC ", ", expand(it));
-        }
-        printf("\n");
-        // printf("space @ %i\n", string_index_substring(arg, string_from_literal(" ")));
-    }
-    // args.strings = NULL;
-    mem_delete(args.strings, cast(size_t)args.len, HEAP_ALLOCATOR);
+    unused(argc);
+    unused(argv);
+    Intern intern = intern_make(HEAP_ALLOCATOR);
+    run_interactive(&intern);
+    intern_destroy(&intern);
     return 0;
 }

@@ -20,9 +20,6 @@ typedef const char *CString;
 // For use with the `printf` format `"%.*s"`.
 #define string_expand(string)   (string).len, (string).data
 
-int
-cstring_len(CString cstring);
-
 String
 string_from_cstring(CString cstring);
 
@@ -44,9 +41,10 @@ string_index_any_string(String haystack, String needle);
 int
 string_index_any_cstring(String haystack, CString needle);
 
-#define string_index_any(haystack, needle) _Generic((needle), \
-    String:  string_index_any_string, \
-    default: string_index_any_cstring \
+#define string_index_any(haystack, needle) _Generic((needle),                  \
+    String: string_index_any_string,                                           \
+    char:   string_index_char,                                                 \
+    char *: string_index_any_cstring                                           \
 )(haystack, needle)
 
 bool

@@ -1,21 +1,12 @@
 #include "strings.h"
 
-#include <assert.h>
-
-int
-cstring_len(CString cstring)
-{
-    const char *end = cstring;
-    while (*end != '\0') {
-        end += 1;
-    }
-    return cast(int)(end - cstring);
-}
+#include <assert.h> // assert
+#include <string.h> // strlen
 
 String
 string_from_cstring(CString cstring)
 {
-    String string = {cstring, cast(int)cstring_len(cstring)};
+    String string = {cstring, cast(int)strlen(cstring)};
     return string;
 }
 
