@@ -11,11 +11,11 @@ typedef struct {
     size_t   len;
     uint32_t hash;
     char     data[];
-} *Intern_String;
+} Intern_String;
 
 typedef struct {
-    String        key;
-    Intern_String value;
+    String         key;
+    Intern_String *value;
 } Intern_Entry;
 
 typedef struct {
@@ -34,7 +34,7 @@ intern_destroy(Intern *intern);
 /**
  * @note
  *      If `string` is not yet interned, we will intern it.
- * 
+ *
  * @return
  *      A `String` instance which points to the interned string.
  *      This string is valid as long as the map lives.

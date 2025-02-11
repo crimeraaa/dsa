@@ -21,10 +21,10 @@ intern_destroy(Intern *intern)
     const size_t  cap       = intern->cap;
 
     for (size_t i = 0; i < cap; i++) {
-        Intern_Entry *entry = &entries[i];
-        Intern_String value = entry->value;
+        Intern_Entry  *entry = &entries[i];
+        Intern_String *value = entry->value;
         if (value == NULL) continue;
-        
+
         mem_rawfree(value, sizeof(*value) + (value->len + 1), allocator);
     }
     mem_delete(entries, cap, allocator);
@@ -39,7 +39,7 @@ static uint32_t
 fnv1a_hash(String data)
 {
     uint32_t hash = FNV1A_OFFSET_32;
-    for (int i = 0; i < data.len; i++) {
+    for (size_t i = 0; i < data.len; i++) {
         // Can't cast the expression to `uint32_t`? Is this not defined behavior?
         hash ^= cast(unsigned char)data.data[i];
         hash *= FNV1A_PRIME_32;
@@ -47,63 +47,62 @@ fnv1a_hash(String data)
     return hash;
 }
 
-// We pass `entries` directly in the case of `_intern_adjust_capacity()`.
+// We pass `entries` directly in the case of `_intern_resize()`.
 static Intern_Entry *
 _intern_get(Intern_Entry entries[], size_t cap, String string)
 {
-    uint32_t hash = fnv1a_hash(string);
-    
     // Division and modulo by zero is undefined behavior.
     if (cap == 0) return NULL;
 
+    uint32_t hash = fnv1a_hash(string);
     for (size_t i = cast(size_t)hash % cap; /* empty */; i = (i + 1) % cap) {
-        Intern_Entry *entry = &entries[i];
-        Intern_String value = entry->value;
-        
+        Intern_Entry  *entry = &entries[i];
+        String         key   = entry->key; // Less memory reads this way
+        Intern_String *value = entry->value;
+
         // This string isn't interned yet.
         if (value == NULL) return entry;
-        
+
         // Probably not a match. Keep looking.
-        if (value->hash != hash || value->len != cast(size_t)string.len) continue;
+        if (value->hash != hash || key.len != cast(size_t)string.len) continue;
 
         // Confirm if it is indeed a match.
-        if (memcmp(string.data, value->data, value->len) == 0) {
-            return entry;
-        }
+        if (memcmp(string.data, key.data, string.len) == 0) return entry;
     }
     __builtin_unreachable();
 }
 
 static void
-_intern_adjust_capacity(Intern *intern, size_t new_cap)
+_intern_resize(Intern *intern, size_t new_cap)
 {
     Allocator     allocator   = intern->allocator;
     Intern_Entry *new_entries = mem_make(Intern_Entry, new_cap, allocator);
-    
+
     // Zero out the new memory.
     for (size_t i = 0; i < new_cap; i++) {
         new_entries[i].key.data = NULL;
         new_entries[i].key.len  = 0;
         new_entries[i].value    = NULL;
     }
-    
+
     // Copy the old entries in the new ones.
-    size_t new_count = 0;
-    for (size_t i = 0; i < intern->cap; i++) {
-        Intern_Entry  old_entry = intern->entries[i];
-        String        key       = old_entry.key;
-        Intern_String value     = old_entry.value;
+    size_t        new_count   = 0;
+    Intern_Entry *old_entries = intern->entries;
+    size_t        old_cap     = intern->cap;
+    for (size_t i = 0; i < old_cap; i++) {
+        String         key   = old_entries[i].key;
+        Intern_String *value = old_entries[i].value;
 
         // Ignore unset keys; these are yet to be interned.
         if (value == NULL) continue;
-        
+
         Intern_Entry *new_entry = _intern_get(new_entries, new_cap, key);
         new_entry->key   = key;
         new_entry->value = value;
         new_count++;
     }
-    
-    mem_delete(intern->entries, intern->cap, allocator);
+
+    mem_delete(old_entries, old_cap, allocator);
     intern->entries = new_entries;
     intern->count   = new_count;
     intern->cap     = new_cap;
@@ -118,28 +117,29 @@ _intern_set(Intern *intern, String string)
     // We do this to ensure there are always empty slots.
     if (intern->count >= (cap * 3) / 4) {
         size_t new_cap = (cap == 0) ? 8 : cap * 2;
-        _intern_adjust_capacity(intern, new_cap);
+        _intern_resize(intern, new_cap);
         // Needed so we can properly do `_intern_get()` later.
         cap = new_cap;
     }
-    
+
     Intern_Entry *entry = _intern_get(intern->entries, cap, string);
-    const size_t  len   = cast(size_t)string.len;
-    
+
     // Add 1 for nul terminator.
-    Intern_String value = cast(Intern_String)mem_rawnew(
-        sizeof(*value) + (len + 1),
+    Intern_String *value = cast(Intern_String *)mem_rawnew(
+        sizeof(*value) + sizeof(value->data[0]) * (string.len + 1),
         alignof(Intern_String), // alignof(*value) is an extension
         intern->allocator);
-    value->len  = len;
+
+    value->len  = string.len;
     value->hash = fnv1a_hash(string);
-    memcpy(value->data, string.data, len);
-    value->data[len] = '\0';
-    
-    String key   = {value->data, cast(int)len};
+    memcpy(value->data, string.data, string.len);
+    value->data[string.len] = '\0';
+
+    // VERY important we point to the heap-allocated data, not `string.data`!
+    String key   = {value->data, string.len};
     entry->key   = key;
     entry->value = value;
-    
+
     // VERY important we keep track of this.
     intern->count++;
     return entry;

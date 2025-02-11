@@ -2,48 +2,38 @@
 
 #include <assert.h> // assert
 #include <string.h> // strlen
+#include <stdlib.h>
+#include <stdint.h>
 
 String
 string_from_cstring(CString cstring)
 {
-    String string = {cstring, cast(int)strlen(cstring)};
+    String string = {cstring, strlen(cstring)};
     return string;
 }
 
 String
-string_slice(String string, int start, int stop)
+string_slice(String string, size_t start, size_t stop)
 {
-    /* 
-       String msg = {data = "Hi mom!", len = 7}
-       string_slice(string = msg, start = -1, stop = -1)
-
-       since (start = -1) < 0
-            start = (string.len = 7) + (start = -1)
-                  = 6
-        
-        since (stop = -1) < 0
-            stop = (string.len = 7) + (stop = -1) + 1
-                 = 6
-     */
-    if (start < 0) start += string.len;
-    if (stop < 0) stop += string.len;
     assert(0 <= start && start < string.len);
-    assert(0 <= stop  && stop  <= string.len);
+    assert(0 <= stop  && stop <= string.len);
+    assert(start <= stop);
+
     String slice = {&string.data[start], stop - start};
     return slice;
 }
 
-int
+size_t
 string_index_substring(String haystack, String needle)
 {
     if (needle.len == 1) return string_index_char(haystack, needle.data[0]);
 
-    for (int offset = 0; offset < haystack.len; offset++) {
+    for (size_t offset = 0; offset < haystack.len; offset++) {
         // Substring cannot possibly be found in the remaining string?
-        if (offset + needle.len >= haystack.len) return -1;
+        if (offset + needle.len >= haystack.len) break;
 
         bool found = true;
-        for (int j = 0; j < needle.len; j++) {
+        for (size_t j = 0; j < needle.len; j++) {
             if (haystack.data[offset + j] != needle.data[j]) {
                 found = false;
                 break;
@@ -52,35 +42,35 @@ string_index_substring(String haystack, String needle)
         }
         if (found) return offset;
     }
-    return -1;
+    return STRING_NOT_FOUND;
 }
 
-int
+size_t
 string_index_subcstring(String haystack, CString needle)
 {
     return string_index_substring(haystack, string_from_cstring(needle));
 }
 
-int
+size_t
 string_index_char(String haystack, char needle)
 {
-    for (int i = 0; i < haystack.len; i++) {
+    for (size_t i = 0; i < haystack.len; i++) {
         if (haystack.data[i] == needle) return i;
     }
-    return -1;
+    return STRING_NOT_FOUND;
 }
 
-int
+size_t
 string_index_any_string(String haystack, String needle)
 {
-    for (int j = 0; j < needle.len; j++) {
-        int i = string_index_char(haystack, needle.data[j]);
-        if (i != -1) return i;
+    for (size_t j = 0; j < needle.len; j++) {
+        size_t i = string_index_char(haystack, needle.data[j]);
+        if (i != STRING_NOT_FOUND) return i;
     }
-    return -1;
+    return STRING_NOT_FOUND;
 }
 
-int
+size_t
 string_index_any_cstring(String haystack, CString needle)
 {
     return string_index_any_string(haystack, string_from_cstring(needle));
@@ -97,20 +87,21 @@ string_split_iterator(String *state, char sep, String *current)
 {
     if (state->len == 0) return false;
 
-    int index = string_index_char(*state, sep);
+    size_t index = string_index_char(*state, sep);
 
-    // If `index == -1`, we match the remainder of the string.
-    *current  = string_slice(*state, 0, index == -1 ? state->len : index);
-    int start, stop;
+    // If `index == STRING_NOT_FOUND`, we match the remainder of the string.
+    *current  = string_slice(*state, 0, (index == STRING_NOT_FOUND) ? state->len : index);
+    size_t start, stop;
     // Can we can safely slice with start = index + 1?
-    if (index != -1 && index + 1 < state->len) {
+    if (index != STRING_NOT_FOUND && index + 1 < state->len) {
         start = index + 1;
         stop  = state->len;
     }
-    // Otherwise, create a zero-length slice. This indicates that the next
-    // iteration will cause the loop to terminate.
+    // Otherwise, create a zero-length slice that points to the very end.
+    // This indicates that the next iteration will cause the loop to terminate.
     else {
-        start = stop = -1;
+        start = state->len - 1;
+        stop  = start;
     }
     *state = string_slice(*state, start, stop);
     return true;

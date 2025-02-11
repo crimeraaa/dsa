@@ -1,10 +1,14 @@
-CC := gcc
-CC_FLAGS := -std=c11 -Wall -Wextra -Wconversion -fsanitize=address -g -O0
+CC := clang
+
+DEBUG_FLAGS := -fsanitize=address -O0 -g
+RELEASE_FLAGS := -O1
+
+CC_FLAGS := -std=c11 -Wall -Wextra -Wconversion $(RELEASE_FLAGS)
 
 SRC := $(wildcard *.c)
 HDR := $(wildcard *.h)
 
 main: $(SRC)
 	$(CC) $(CC_FLAGS) -o $@ $^
-	
+
 %.c: %.h

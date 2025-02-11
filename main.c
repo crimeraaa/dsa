@@ -5,11 +5,6 @@
 #include "strings.h"
 #include "intern.h"
 
-typedef struct {
-    String *strings;
-    int len;
-} Args;
-
 #define expand  string_expand
 
 #define printfln(fmt, ...)  printf(fmt "\n", __VA_ARGS__)
@@ -18,18 +13,20 @@ typedef struct {
 static void
 run_interactive(Intern *intern)
 {
-    char buf[BUFSIZ];
+    char buf[256];
     for (;;) {
         fputs(">>> ", stdout);
         if (!fgets(buf, cast(int)sizeof(buf), stdin)) {
             fputc('\n', stdout);
             break;
         }
-        int len = cast(int)strcspn(buf, "\r\n");
-        buf[len] = '\0';
-        String key = {buf, len};
+        String key      = {buf, strcspn(buf, "\r\n")};
         String interned = intern_get(intern, key);
         printfln(STRING_QFMTSPEC " @ %p", expand(interned), cast(void *)interned.data);
+
+        for (String state = interned, it; string_split_iterator(&state, ' ', &it); ) {
+            printfln("\t - " STRING_QFMTSPEC, expand(it));
+        }
     }
 }
 
