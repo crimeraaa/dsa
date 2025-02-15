@@ -32,17 +32,17 @@ intern_destroy(Intern *intern)
     intern->count   = intern->cap = 0;
 }
 
-#define FNV1A_OFFSET_32 2166136261
-#define FNV1A_PRIME_32  16777619
+#define FNV_OFFSET  2166136261
+#define FNV_PRIME   16777619
 
 static uint32_t
-fnv1a_hash(String data)
+fnv_hash(String data)
 {
-    uint32_t hash = FNV1A_OFFSET_32;
+    uint32_t hash = FNV_OFFSET;
     for (size_t i = 0; i < data.len; i++) {
         // Can't cast the expression to `uint32_t`? Is this not defined behavior?
         hash ^= cast(unsigned char)data.data[i];
-        hash *= FNV1A_PRIME_32;
+        hash *= FNV_PRIME;
     }
     return hash;
 }
@@ -54,7 +54,7 @@ _intern_get(Intern_Entry entries[], size_t cap, String string)
     // Division and modulo by zero is undefined behavior.
     if (cap == 0) return NULL;
 
-    uint32_t hash = fnv1a_hash(string);
+    uint32_t hash = fnv_hash(string);
     for (size_t i = cast(size_t)hash % cap; /* empty */; i = (i + 1) % cap) {
         Intern_Entry  *entry = &entries[i];
         String         key   = entry->key; // Less memory reads this way
@@ -64,7 +64,7 @@ _intern_get(Intern_Entry entries[], size_t cap, String string)
         if (value == NULL) return entry;
 
         // Probably not a match. Keep looking.
-        if (value->hash != hash || key.len != cast(size_t)string.len) continue;
+        if (value->hash != hash || key.len != string.len) continue;
 
         // Confirm if it is indeed a match.
         if (memcmp(string.data, key.data, string.len) == 0) return entry;
@@ -78,7 +78,7 @@ _intern_resize(Intern *intern, size_t new_cap)
     Allocator     allocator   = intern->allocator;
     Intern_Entry *new_entries = mem_make(Intern_Entry, new_cap, allocator);
 
-    // Zero out the new memory.
+    // Zero out the new memory so that we can safely read them.
     for (size_t i = 0; i < new_cap; i++) {
         new_entries[i].key.data = NULL;
         new_entries[i].key.len  = 0;
@@ -108,7 +108,6 @@ _intern_resize(Intern *intern, size_t new_cap)
     intern->cap     = new_cap;
 }
 
-// Sets `out_entry` to point to the interned version of `string`.
 static Intern_Entry *
 _intern_set(Intern *intern, String string)
 {
@@ -127,11 +126,12 @@ _intern_set(Intern *intern, String string)
     // Add 1 for nul terminator.
     Intern_String *value = cast(Intern_String *)mem_rawnew(
         sizeof(*value) + sizeof(value->data[0]) * (string.len + 1),
-        alignof(Intern_String), // alignof(*value) is an extension
-        intern->allocator);
+        alignof(Intern_String), // alignof(*value) is an extension MSVC doesn't have
+        intern->allocator
+    );
 
     value->len  = string.len;
-    value->hash = fnv1a_hash(string);
+    value->hash = fnv_hash(string);
     memcpy(value->data, string.data, string.len);
     value->data[string.len] = '\0';
 
