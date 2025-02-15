@@ -1,6 +1,7 @@
 #include "intern.h"
 
 #include <string.h> // memcmp and memcpy, likely highly optimized
+#include <stdio.h>  // fprintf
 
 Intern
 intern_make(Allocator allocator)
@@ -21,8 +22,7 @@ intern_destroy(Intern *intern)
     const size_t  cap       = intern->cap;
 
     for (size_t i = 0; i < cap; i++) {
-        Intern_Entry  *entry = &entries[i];
-        Intern_String *value = entry->value;
+        Intern_String *value = entries[i].value;
         if (value == NULL) continue;
 
         mem_rawfree(value, sizeof(*value) + (value->len + 1), allocator);
@@ -115,10 +115,10 @@ _intern_set(Intern *intern, String string)
     // Adjust by 0.75 load factor
     // We do this to ensure there are always empty slots.
     if (intern->count >= (cap * 3) / 4) {
-        size_t new_cap = (cap == 0) ? 8 : cap * 2;
-        _intern_resize(intern, new_cap);
-        // Needed so we can properly do `_intern_get()` later.
-        cap = new_cap;
+        // We don't need to track the old cap. We do however need the updated
+        // value so we can properly do `_intern_get()` later.
+        cap = (cap == 0) ? 8 : cap * 2;
+        _intern_resize(intern, cap);
     }
 
     Intern_Entry *entry = _intern_get(intern->entries, cap, string);
@@ -150,9 +150,59 @@ intern_get(Intern *intern, String string)
 {
     Intern_Entry *entry = _intern_get(intern->entries, intern->cap, string);
     // If not yet interned, do so now.
-    if (entry == NULL || entry->value == NULL) {
-        entry = _intern_set(intern, string);
-    }
+    if (entry == NULL || entry->value == NULL) entry = _intern_set(intern, string);
+
     // key already points to the interned value.
     return entry->key;
+}
+
+void
+intern_print(const Intern *intern, FILE *stream)
+{
+    const Intern_Entry *entries    = intern->entries;
+    const size_t        cap        = intern->cap;
+    size_t             *collisions = mem_make(size_t, cap, intern->allocator);
+    size_t              totals     = 0;
+
+    memset(collisions, 0, sizeof(collisions[0]) * cap);
+
+    int count_digits = (cap == 0) ? 1 : 0;
+    for (size_t tmp = cap; tmp != 0; tmp /= 10) {
+        ++count_digits;
+    }
+
+    fprintf(stream, "[INTERNED]\n");
+    for (size_t i = 0; i < cap; ++i) {
+        const Intern_String *value = entries[i].value;
+
+        fprintf(stream, "\t- [%0*zu]:", count_digits, i);
+        if (value != NULL) {
+            fprintf(stream, " \"%s\"", value->data);
+            size_t optimal = cast(size_t)value->hash % cap;
+            if (optimal != i) {
+                fprintf(stream, "; (collision @ %zu)", optimal);
+                ++collisions[optimal];
+                ++totals;
+            }
+        }
+        fputc('\n', stream);
+    }
+
+    fprintf(stream, "\n[COLLISIONS]\n");
+    for (size_t i = 0; i < cap; ++i) {
+        fprintf(stream, "\t- [%0*zu]: ", count_digits, i);
+        for (size_t j = 0, len = collisions[i]; j < len; ++j) {
+            fputc('=', stream);
+        }
+        fputc('\n', stream);
+    }
+
+    fprintf(stream,
+        "\n[STATISTICS]\n"
+        "\t- Count:      %zu\n"
+        "\t- Cap:        %zu\n"
+        "\t- Unused:     %zu\n"
+        "\t- Collisions: %zu\n",
+        intern->count, cap, cap - intern->count, totals);
+    mem_delete(collisions, cap, intern->allocator);
 }

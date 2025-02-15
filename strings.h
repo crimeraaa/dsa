@@ -8,8 +8,6 @@ typedef struct {
     size_t      len;
 } String;
 
-typedef const char *CString;
-
 #define string_from_literal(literal)    (String){literal, sizeof(literal) - 1}
 
 #define STRING_FMTSPEC      "%.*s"
@@ -22,7 +20,7 @@ typedef const char *CString;
 #define STRING_NOT_FOUND    ((size_t)-1)
 
 String
-string_from_cstring(CString cstring);
+string_from_cstring(const char *cstring);
 
 String
 string_slice(String string, size_t start, size_t stop);
@@ -31,7 +29,7 @@ size_t
 string_index_substring(String haystack, String needle);
 
 size_t
-string_index_subcstring(String haystack, CString needle);
+string_index_subcstring(String haystack, const char *needle);
 
 size_t
 string_index_char(String haystack, char needle);
@@ -40,7 +38,7 @@ size_t
 string_index_any_string(String haystack, String needle);
 
 size_t
-string_index_any_cstring(String haystack, CString needle);
+string_index_any_cstring(String haystack, const char *needle);
 
 #define string_index_any(haystack, needle) _Generic((needle),                  \
     String:       string_index_any_string,                                     \

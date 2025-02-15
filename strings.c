@@ -2,11 +2,9 @@
 
 #include <assert.h> // assert
 #include <string.h> // strlen
-#include <stdlib.h>
-#include <stdint.h>
 
 String
-string_from_cstring(CString cstring)
+string_from_cstring(const char *cstring)
 {
     String string = {cstring, strlen(cstring)};
     return string;
@@ -46,7 +44,7 @@ string_index_substring(String haystack, String needle)
 }
 
 size_t
-string_index_subcstring(String haystack, CString needle)
+string_index_subcstring(String haystack, const char *needle)
 {
     return string_index_substring(haystack, string_from_cstring(needle));
 }
@@ -71,7 +69,7 @@ string_index_any_string(String haystack, String needle)
 }
 
 size_t
-string_index_any_cstring(String haystack, CString needle)
+string_index_any_cstring(String haystack, const char *needle)
 {
     return string_index_any_string(haystack, string_from_cstring(needle));
 }
@@ -90,7 +88,7 @@ string_split_iterator(String *state, char sep, String *current)
     size_t index = string_index_char(*state, sep);
 
     // If `index == STRING_NOT_FOUND`, we match the remainder of the string.
-    *current  = string_slice(*state, 0, (index == STRING_NOT_FOUND) ? state->len : index);
+    *current = string_slice(*state, 0, (index == STRING_NOT_FOUND) ? state->len : index);
     size_t start, stop;
     // Can we can safely slice with start = index + 1?
     if (index != STRING_NOT_FOUND && index + 1 < state->len) {

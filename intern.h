@@ -2,6 +2,7 @@
 #define INTERN_H
 
 #include <stdint.h>
+#include <stdio.h>
 
 #include "common.h"
 #include "strings.h"
@@ -41,5 +42,8 @@ intern_destroy(Intern *intern);
  */
 String
 intern_get(Intern *intern, String string);
+
+void
+intern_print(const Intern *intern, FILE *stream);
 
 #endif // INTERN_H
