@@ -9,8 +9,8 @@ typedef struct {
 } Intern_String;
 
 struct Intern_Entry {
-    String         key;
-    uint32_t       hash;
+    String         key;   // Used so we don't need so many pointer dereferences.
+    uint32_t       hash;  // Faster to cache than calculate hash for variable-length strings.
     int            probe; // Our distance from our ideal position `hash % cap`.
     Intern_String *value;
 };
@@ -34,7 +34,7 @@ intern_destroy(Intern *intern)
     Intern_Entry *entries   = intern->entries;
     const size_t  cap       = intern->cap;
 
-    for (size_t i = 0; i < cap; i++) {
+    for (size_t i = 0; i < cap; ++i) {
         Intern_String *value = entries[i].value;
         if (value == NULL)
             continue;
@@ -54,7 +54,7 @@ static uint32_t
 fnv_hash(String data)
 {
     uint32_t hash = FNV_OFFSET;
-    for (size_t i = 0; i < data.len; i++) {
+    for (size_t i = 0; i < data.len; ++i) {
         // Can't cast the expression to `uint32_t`? Is this not defined behavior?
         hash ^= cast(unsigned char)data.data[i];
         hash *= FNV_PRIME;
@@ -71,7 +71,7 @@ _intern_get(Intern_Entry entries[], size_t cap, String string, int *probe)
         return NULL;
 
     uint32_t hash   = fnv_hash(string);
-    int      _probe = 0;
+    int      _probe = 0; // Micro-optimization to avoid constant pointer dereferences.
     for (size_t i = cast(size_t)hash % cap; /* empty */; ++_probe, i = (i + 1) % cap) {
         // This string isn't interned yet.
         if (entries[i].value == NULL)
@@ -82,7 +82,7 @@ _intern_get(Intern_Entry entries[], size_t cap, String string, int *probe)
             continue;
 
         // Confirm if it is indeed a match.
-        if (memcmp(string.data, entries[i].key.data, string.len) == 0) set_result: {
+        if (string_eq(string, entries[i].key)) set_result: {
             *probe = _probe;
             return &entries[i];
         }
@@ -269,6 +269,11 @@ intern_print(const Intern *intern, FILE *stream)
         "\t- Unused:     %zu\n"
         "\t- Collisions: %i\n"
         "\t- Max. Probe: %i\n",
-        intern->count, cap, cap - intern->count, totals, intern->max_probe);
+        intern->count,
+        cap,
+        cap - intern->count,
+        totals,
+        intern->max_probe
+    );
     mem_delete(probes, cap, intern->allocator);
 }
