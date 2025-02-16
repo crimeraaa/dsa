@@ -102,6 +102,8 @@ main(int argc, char *argv[])
         }
         FILE *output = fopen("output.txt", "w+");
         intern_print(&intern, output);
+        // if (argc == 2)
+        //     intern_print(&intern, stdout);
         fclose(output);
     }
     intern_destroy(&intern);

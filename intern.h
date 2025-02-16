@@ -8,22 +8,15 @@
 #include "strings.h"
 #include "allocator.h"
 
-typedef struct {
-    size_t   len;
-    uint32_t hash;
-    char     data[];
-} Intern_String;
-
-typedef struct {
-    String         key;
-    Intern_String *value;
-} Intern_Entry;
+// Opaque type so you don't get any funny ideas!
+typedef struct Intern_Entry Intern_Entry;
 
 typedef struct {
     Allocator     allocator;
     Intern_Entry *entries;
     size_t        count;
-    size_t        cap;
+    size_t        cap; // Must always be a power of 2.
+    int           max_probe;
 } Intern;
 
 Intern
