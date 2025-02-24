@@ -14,7 +14,7 @@ typedef struct {
 #define STRING_QFMTSPEC     "\"" STRING_FMTSPEC "\""
 
 // For use with the `printf` format `"%.*s"`.
-#define string_expand(string)   (int)(string).len, (string).data
+#define string_expand(string)   (int)((string).len), ((string).data)
 
 // Assumes you'll never have a string this big!
 #define STRING_NOT_FOUND    ((size_t)-1)
