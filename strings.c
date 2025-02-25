@@ -41,18 +41,83 @@ string_slice(String string, size_t start, size_t stop)
     return slice;
 }
 
+String
+string_trim_space(String text)
+{
+    return string_trim_right_space(string_trim_left_space(text));
+}
+
+// https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Whitespace.html
+static bool
+is_whitespace(char ch)
+{
+    switch (ch) {
+    case ' ':
+    case '\t': // horizontal tab
+    case '\f': // form-feed
+    case '\v': // vertical-tab
+    case '\r': // carriage-return
+    case '\n': // linefeed
+        return true;
+    default:
+        return false;
+    }
+}
+
+String
+string_trim_left_space(String text)
+{
+    return string_trim_left_fn(text, &is_whitespace);
+}
+
+String
+string_trim_right_space(String text)
+{
+    return string_trim_right_fn(text, &is_whitespace);
+}
+
+String
+string_trim_left_fn(String text, bool (*callback)(char ch))
+{
+    size_t index = string_index_fn(text, callback, false);
+    if (index == STRING_NOT_FOUND)
+        return string_slice(text, 0, 0);
+    return string_slice(text, index, text.len);
+}
+
+String
+string_trim_right_fn(String text, bool (*callback)(char ch))
+{
+    size_t index = string_last_index_fn(text, callback, false);
+    if (index == STRING_NOT_FOUND)
+        index = 0;
+    return string_slice(text, 0, index);
+}
+
+// LEFT INDEX FUNCTIONS ---------------------------------------------------- {{{
+
+size_t
+string_index_fn(String text, bool (*callback)(char ch), bool comparison)
+{
+    string_for_eachi(index, text) {
+        if (callback(text.data[index]) == comparison)
+            return index;
+    }
+    return STRING_NOT_FOUND;
+}
+
 size_t
 string_index_substring(String haystack, String needle)
 {
     if (needle.len == 1)
         return string_index_char(haystack, needle.data[0]);
 
-    for (size_t offset = 0; offset < haystack.len; ++offset) {
+    string_for_eachi(offset, haystack) {
         // Substring cannot possibly be found in the remaining string?
         if (offset + needle.len >= haystack.len) break;
 
         bool found = true;
-        for (size_t j = 0; j < needle.len; ++j) {
+        string_for_eachi(j, needle) {
             if (haystack.data[offset + j] != needle.data[j]) {
                 found = false;
                 break;
@@ -74,7 +139,7 @@ string_index_subcstring(String haystack, const char *needle)
 size_t
 string_index_char(String haystack, char needle)
 {
-    for (size_t i = 0; i < haystack.len; ++i) {
+    string_for_eachi(i, haystack) {
         if (haystack.data[i] == needle)
             return i;
     }
@@ -82,10 +147,10 @@ string_index_char(String haystack, char needle)
 }
 
 size_t
-string_index_any_string(String haystack, String needle)
+string_index_any_string(String haystack, String charset)
 {
-    for (size_t j = 0; j < needle.len; ++j) {
-        size_t i = string_index_char(haystack, needle.data[j]);
+    string_for_each(ptr, charset) {
+        size_t i = string_index_char(haystack, *ptr);
         if (i != STRING_NOT_FOUND)
             return i;
     }
@@ -93,10 +158,57 @@ string_index_any_string(String haystack, String needle)
 }
 
 size_t
-string_index_any_cstring(String haystack, const char *needle)
+string_index_any_cstring(String haystack, const char *charset)
 {
-    return string_index_any_string(haystack, string_from_cstring(needle));
+    return string_index_any_string(haystack, string_from_cstring(charset));
 }
+
+// }}} -------------------------------------------------------------------------
+
+// RIGHT INDEX FUNCTIONS --------------------------------------------------- {{{
+
+size_t
+string_last_index_fn(String text, bool (*callback)(char ch), bool comparison)
+{
+    // Once we overflow, bail out.
+    for (size_t i = text.len - 1; i < STRING_NOT_FOUND; --i) {
+        if (callback(text.data[i]) == comparison)
+            return i;
+    }
+    return STRING_NOT_FOUND;
+}
+
+size_t
+string_last_index_char(String haystack, char needle)
+{
+    // Once we overflow, bail out.
+    for (size_t i = haystack.len - 1; i < STRING_NOT_FOUND; --i) {
+        if (haystack.data[i] == needle)
+            return i;
+    }
+    return STRING_NOT_FOUND;
+}
+
+size_t
+string_last_index_any_string(String haystack, String charset)
+{
+    string_for_each(ptr, charset) {
+        size_t i = string_last_index_char(haystack, *ptr);
+        if (i != STRING_NOT_FOUND)
+            return i;
+    }
+    return STRING_NOT_FOUND;
+}
+
+size_t
+string_last_index_any_cstring(String haystack, const char *charset)
+{
+    return string_last_index_any_string(haystack, string_from_cstring(charset));
+}
+
+// }}} -------------------------------------------------------------------------
+
+// SPLIT ITERATORS --------------------------------------------------------- {{{
 
 bool
 string_split_lines_iterator(String *state, String *current)
@@ -150,3 +262,5 @@ string_split_string_iterator(String *state, String *current, String sep)
     size_t index = string_index_substring(*state, sep);
     return _string_split_iterator(state, current, index);
 }
+
+// }}} -------------------------------------------------------------------------

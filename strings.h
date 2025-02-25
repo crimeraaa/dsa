@@ -8,6 +8,14 @@ typedef struct {
     size_t      len;
 } String;
 
+#define string_for_each(ptr, string) \
+for (const char *ptr = (string).data, *const _end_ = ptr + (string).len; \
+    ptr < _end_; \
+    ++ptr)
+
+#define string_for_eachi(idx, string) \
+for (size_t idx = 0, _end_ = (string).len; idx < _end_; ++idx)
+
 // C99 compound literals have VERY different semantics in C++.
 #ifdef __cplusplus
 #define string_from_literal(literall)   {literal, sizeof(literal) - 1}
@@ -33,6 +41,27 @@ string_from_cstring(const char *cstring);
 String
 string_slice(String string, size_t start, size_t stop);
 
+// Returns a slice of `text` that does not include any whitespace to either side.
+String
+string_trim_space(String text);
+
+String
+string_trim_left_space(String text);
+
+String
+string_trim_right_space(String text);
+
+String
+string_trim_left_fn(String text, bool (*callback)(char ch));
+
+String
+string_trim_right_fn(String text, bool (*callback)(char ch));
+
+// LEFT INDEX FUNCTIONS ---------------------------------------------------- {{{
+
+size_t
+string_index_fn(String text, bool (*callback)(char ch), bool comparison);
+
 size_t
 string_index_substring(String haystack, String needle);
 
@@ -43,10 +72,30 @@ size_t
 string_index_char(String haystack, char needle);
 
 size_t
-string_index_any_string(String haystack, String needle);
+string_index_any_string(String haystack, String charset);
 
 size_t
-string_index_any_cstring(String haystack, const char *needle);
+string_index_any_cstring(String haystack, const char *charset);
+
+// }}} -------------------------------------------------------------------------
+
+// RIGHT INDEX FUNCTIONS --------------------------------------------------- {{{
+
+size_t
+string_last_index_fn(String text, bool (*callback)(char ch), bool comparison);
+
+size_t
+string_last_index_char(String haystack, char needle);
+
+size_t
+string_last_index_any_string(String haystack, String charset);
+
+size_t
+string_last_index_any_cstring(String haystack, const char *charset);
+
+// }}} -------------------------------------------------------------------------
+
+// SPLIT ITERATORS --------------------------------------------------------- {{{
 
 bool
 string_split_char_iterator(String *state, String *current, char sep);
@@ -59,6 +108,8 @@ string_split_cstring_iterator(String *state, String *current, const char *sep);
 
 bool
 string_split_lines_iterator(String *state, String *current);
+
+// }}} -------------------------------------------------------------------------
 
 #if defined(__STDC__) && __STDC_VERSION__ >= 201112L
 

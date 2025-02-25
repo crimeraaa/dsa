@@ -1,7 +1,7 @@
 CC := clang
 
 DEBUG_FLAGS := -fsanitize=address -O0 -g
-RELEASE_FLAGS := -O1
+RELEASE_FLAGS := -O1 -s
 
 CC_FLAGS := -std=c11 -Wall -Wextra -Wconversion -pedantic $(RELEASE_FLAGS)
 

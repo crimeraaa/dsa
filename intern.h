@@ -19,6 +19,11 @@ typedef struct {
     int           max_probe;
 } Intern;
 
+typedef struct {
+    size_t   len;
+    char     data[];
+} Intern_String;
+
 Intern
 intern_make(Allocator allocator);
 

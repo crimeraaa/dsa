@@ -3,11 +3,6 @@
 #include <string.h> // memcmp and memcpy, likely highly optimized
 #include <stdio.h>  // fprintf
 
-typedef struct {
-    size_t   len;
-    char     data[];
-} Intern_String;
-
 struct Intern_Entry {
     String         key;   // Used so we don't need so many pointer dereferences.
     uint32_t       hash;  // Faster to cache than calculate hash for variable-length strings.
@@ -55,9 +50,9 @@ static uint32_t
 fnv_hash(String data)
 {
     uint32_t hash = FNV_OFFSET;
-    for (size_t i = 0; i < data.len; ++i) {
+    string_for_each(datum, data) {
         // Can't cast the expression to `uint32_t`? Is this not defined behavior?
-        hash ^= cast(unsigned char)data.data[i];
+        hash ^= cast(unsigned char)*datum;
         hash *= FNV_PRIME;
     }
     return hash;
@@ -65,21 +60,21 @@ fnv_hash(String data)
 
 // We pass `entries` directly in the case of `_intern_resize()`.
 static Intern_Entry *
-_intern_get(Intern_Entry entries[], size_t cap, String string, int *probe)
+_intern_get(Intern_Entry entries[], size_t cap, String string, uint32_t hash, int *probe)
 {
     // Division (and by extension, modulo) by zero is undefined behavior.
     if (cap == 0)
         return NULL;
 
-    uint32_t hash   = fnv_hash(string);
-    int      _probe = 0; // Micro-optimization to avoid constant pointer dereferences.
+    // Micro-optimization to avoid constant pointer dereferences.
+    int _probe = 0;
     for (size_t i = cast(size_t)hash % cap; /* empty */; ++_probe, i = (i + 1) % cap) {
         // This string isn't interned yet.
         if (entries[i].value == NULL)
             goto set_result;
 
         // Probably not a match. Keep looking.
-        if (entries[i].hash != hash || entries[i].key.len != string.len)
+        if (entries[i].hash != hash)
             continue;
 
         // Confirm if it is indeed a match.
@@ -105,13 +100,7 @@ _intern_resize(Intern *intern, size_t new_cap)
     Intern_Entry *new_entries = mem_make(Intern_Entry, new_cap, allocator);
 
     // Zero out the new memory so that we can safely read them.
-    for (size_t i = 0; i < new_cap; ++i) {
-        new_entries[i].key.data = NULL;
-        new_entries[i].key.len  = 0;
-        new_entries[i].hash     = 0;
-        new_entries[i].probe    = 0;
-        new_entries[i].value    = NULL;
-    }
+    memset(new_entries, 0, sizeof(new_entries[0]) * new_cap);
 
     // Copy the old non-empty entries.
     size_t        new_count   = 0;
@@ -125,7 +114,7 @@ _intern_resize(Intern *intern, size_t new_cap)
             continue;
 
         int           probe;
-        Intern_Entry *new_entry = _intern_get(new_entries, new_cap, old_entries[i].key, &probe);
+        Intern_Entry *new_entry = _intern_get(new_entries, new_cap, old_entries[i].key, old_entries[i].hash, &probe);
 
         // Probe may be different now that we've resized the hash table.
         *new_entry       = old_entries[i];
@@ -153,7 +142,7 @@ swap(Intern_Entry *a, Intern_Entry *b)
 #define LF_NUMERATOR    3
 #define LF_DENOMINATOR  4
 
-static Intern_Entry *
+static void
 _intern_set(Intern *intern, String text)
 {
     size_t cap = intern->cap;
@@ -196,7 +185,7 @@ _intern_set(Intern *intern, String text)
         if (entries[i].value == NULL) {
             entries[i] = entry;
             ++intern->count;
-            return &entries[i];
+            return;
         }
 
         // Is our current collision "richer" (closer to desired index) than us?
@@ -211,11 +200,14 @@ _intern_set(Intern *intern, String text)
 String
 intern_get(Intern *intern, String text)
 {
+    uint32_t      hash  = fnv_hash(text);
     int           probe; // Only needed to avoid NULL checks in `_intern_get()`.
-    Intern_Entry *entry = _intern_get(intern->entries, intern->cap, text, &probe);
+    Intern_Entry *entry = _intern_get(intern->entries, intern->cap, text, hash, &probe);
     // If not yet interned, do so now.
-    if (entry == NULL || entry->value == NULL)
-        entry = _intern_set(intern, text);
+    if (entry == NULL || entry->value == NULL) {
+        _intern_set(intern, text);
+        return _intern_get(intern->entries, intern->cap, text, hash, &probe)->key;
+    }
 
     // key already points to the interned value.
     return entry->key;
