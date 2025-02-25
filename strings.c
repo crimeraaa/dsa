@@ -254,6 +254,16 @@ string_split_char_iterator(String *state, String *current, char sep)
 }
 
 bool
+string_split_any_string_iterator(String *state, String *current, String charset)
+{
+    if (state->len == 0)
+        return false;
+
+    size_t index = string_index_any_string(*state, charset);
+    return _string_split_iterator(state, current, index);
+}
+
+bool
 string_split_string_iterator(String *state, String *current, String sep)
 {
     if (state->len == 0)

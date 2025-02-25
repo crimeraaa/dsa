@@ -101,6 +101,9 @@ bool
 string_split_char_iterator(String *state, String *current, char sep);
 
 bool
+string_split_any_string_iterator(String *state, String *current, String charset);
+
+bool
 string_split_string_iterator(String *state, String *current, String sep);
 
 bool

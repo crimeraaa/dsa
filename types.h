@@ -9,6 +9,8 @@
 #include <stdint.h>
 
 typedef enum {
+    TYPEID_NONE,
+    
     // Miscallenous Types: void, <type> *
     // You cannot declare variables of type `void`. Only `void *` is allowed.
     TYPEID_VOID,

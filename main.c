@@ -40,46 +40,6 @@ TYPES[] = {
     {.name = literal("complex double"), .info = NEW_COMPLEX(TYPEID_DOUBLE)},
 };
 
-// TODO: This is very ugly...
-static const struct {
-    String name, alias;
-} ALIASES[] = {
-    // https://stackoverflow.com/questions/44624857/is-int-always-signed
-    {.name = literal("int"),       .alias = literal("signed")},
-    {.name = literal("int"),       .alias = literal("signed int")},
-    {.name = literal("int"),       .alias = literal("int signed")},
-    
-    // signed <type>
-    {.name = literal("short"),      .alias = literal("signed short")},
-    {.name = literal("int"),        .alias = literal("signed int")},
-    {.name = literal("long"),       .alias = literal("signed long")},
-    {.name = literal("long long"),  .alias = literal("signed long long")},
-    
-    // <type> signed
-    {.name = literal("signed char"), .alias = literal("char signed")},
-    {.name = literal("short"),      .alias = literal("short signed")},
-    {.name = literal("int"),        .alias = literal("int signed")},
-    {.name = literal("long"),       .alias = literal("long signed")},
-    {.name = literal("long long"),  .alias = literal("long long signed")},
-    
-    // <type> unsigned
-    {.name = literal("unsigned char"),      .alias = literal("char unsigned")},
-    {.name = literal("unsigned short"),      .alias = literal("short unsigned")},
-    {.name = literal("unsigned int"),        .alias = literal("int unsigned")},
-    {.name = literal("unsigned long"),       .alias = literal("long unsigned")},
-    {.name = literal("unsigned long long"),  .alias = literal("long long unsigned")},
-
-    // <size> int
-    {.name = literal("short"),      .alias = literal("short int")},
-    {.name = literal("long"),       .alias = literal("long int")},
-    {.name = literal("long long"),  .alias = literal("long long int")},
-
-    // int <size>
-    {.name = literal("short"),      .alias = literal("int short")},
-    {.name = literal("long"),       .alias = literal("int long")},
-    {.name = literal("long long"),  .alias = literal("int long long")},
-};
-
 static void
 initialize_types(Type_Info_Table *table)
 {
@@ -89,10 +49,170 @@ initialize_types(Type_Info_Table *table)
         type_info_table_add(table, name, info);
     }
 
-    for (size_t i = 0; i < count_of(ALIASES); ++i) {
-        type_info_table_alias(table, ALIASES[i].name, ALIASES[i].alias);
-    }
     type_info_table_print(table);
+}
+
+static bool
+set_type_id(Type_Info *info, Type_Id id, String word, String type)
+{
+    if (string_eq(word, type)) {
+        // Was previously set?
+        if (info->id != TYPEID_NONE)
+            return false;
+
+        info->id = id;
+    }
+    return true;
+}
+
+static bool
+set_type_mod(Type_Info *info, Type_Modifier mod, String word, String modstr)
+{
+    if (string_eq(word, modstr)) {
+        // Was previously set?
+        if (info->modifier != TYPEMOD_NONE)
+            return false;
+
+        info->modifier = mod;
+    }
+    return true;
+}
+
+static void
+resolve_type(Type_Info *info)
+{
+    if (info->id == TYPEID_NONE && info->modifier != TYPEMOD_NONE) {
+        switch (info->modifier) {
+        // Resolve `signed int` to just `int`.
+        case TYPEMOD_SIGNED:
+            info->modifier = TYPEMOD_NONE; // fallthrough
+        case TYPEMOD_UNSIGNED:
+            info->id = TYPEID_INT;
+            break;
+        case TYPEMOD_COMPLEX:
+            info->id = TYPEID_DOUBLE;
+            break;
+        default:
+            break;
+        }
+    }
+    // Resolve `signed short`, `long long signed` to just their types.
+    else if (info->id != TYPEID_CHAR && info->modifier == TYPEMOD_SIGNED) {
+        info->modifier = TYPEMOD_NONE;
+    }
+}
+
+#define WHITESPACE  literal(" \r\n\t\v\f")
+
+static const Type_Info *
+parse_type(Type_Info_Table *table, String type)
+{
+    // This type already exists and is valid?
+    const Type_Info *_info = type_info_table_get(table, type);
+    if (_info != NULL)
+        return _info;
+
+    // Parse the string `type` and generate a query from it.
+    Type_Info info = {.id = TYPEID_NONE, .modifier = TYPEMOD_NONE, .pointee = NULL};
+    for (String state = type, word; string_split_any_string_iterator(&state, &word, WHITESPACE);) {
+        switch (word.data[0]) {
+        case 'c': {
+            if (!set_type_id(&info, TYPEID_CHAR, word, literal("char")))
+                return NULL;
+            if (!set_type_mod(&info, TYPEMOD_COMPLEX, word, literal("complex")))
+                return NULL;
+            break;
+        }
+        case 'i':
+            if (!set_type_id(&info, TYPEID_INT, word, literal("int"))) {
+                // `long int` and `long long int` are valid.
+                if (info.id == TYPEID_LONG || info.id == TYPEID_LONG_LONG)
+                    continue;
+                return NULL;
+            }
+            break;
+        case 'l':
+            if (!set_type_id(&info, TYPEID_LONG, word, literal("long"))) {
+                // Do not error out on `int long`.
+                if (info.id == TYPEID_INT) {
+                    info.id = TYPEID_LONG;
+                    continue;
+                }
+                // Do not error out on `long long`.
+                else if (info.id == TYPEID_LONG) {
+                    info.id = TYPEID_LONG_LONG;
+                    continue;
+                }
+                return NULL;
+            }
+            break;
+        case 's':
+            if (!set_type_id(&info, TYPEID_SHORT, word, literal("short")))
+                return NULL;
+            if (!set_type_mod(&info, TYPEMOD_SIGNED, word, literal("signed")))
+                return NULL;
+            break;
+        case 'u':
+            if (!set_type_mod(&info, TYPEMOD_UNSIGNED, word, literal("unsigned")))
+                return NULL;
+            break;
+        case 'v':
+            if (!set_type_id(&info, TYPEID_VOID, word, literal("void")))
+                return NULL;
+            break;
+        }
+    }
+    
+    
+    char   buf[512];
+    char  *start = buf;
+    size_t rem   = sizeof(buf);
+    int    len   = 0;
+    
+    resolve_type(&info);
+    switch (info.modifier) {
+    case TYPEMOD_NONE:
+        break;
+    case TYPEMOD_SIGNED:
+        len += snprintf(start, rem, "signed ");
+        break;
+    case TYPEMOD_UNSIGNED:
+        len += snprintf(start, rem, "unsigned ");
+        break;
+    case TYPEMOD_COMPLEX:
+        len += snprintf(start, rem, "complex ");
+        break;
+    }
+    
+    start += len;
+    rem   -= cast(size_t)len;
+
+    switch (info.id) {
+    case TYPEID_VOID:       len += snprintf(start, rem, "void"); break;
+    case TYPEID_CHAR:       len += snprintf(start, rem, "char"); break;
+    case TYPEID_SHORT:      len += snprintf(start, rem, "short"); break;
+    case TYPEID_INT:        len += snprintf(start, rem, "int"); break;
+    case TYPEID_LONG:       len += snprintf(start, rem, "long"); break;
+    case TYPEID_LONG_LONG:  len += snprintf(start, rem, "long long"); break;
+
+    case TYPEID_FLOAT:      len += snprintf(start, rem, "float"); break;
+    case TYPEID_DOUBLE:     len += snprintf(start, rem, "double"); break;
+    case TYPEID_ENUM:       len += snprintf(start, rem, "enum"); break;
+    case TYPEID_STRUCT:     len += snprintf(start, rem, "struct"); break;
+    case TYPEID_UNION:      len += snprintf(start, rem, "union"); break;
+    case TYPEID_POINTER:    len += snprintf(start, rem, "*"); break;
+        
+    default:
+        break;
+    }
+    
+    start += len;
+    rem   -= cast(size_t)len;
+    
+    String query = {buf, cast(size_t)len};
+    printfln("Query: " STRING_QFMTSPEC, expand(query));
+    return type_info_table_get(table, query);
+    // return true;
 }
 
 static void
@@ -107,8 +227,8 @@ run_interactive(Type_Info_Table *table)
         }
         
         String tmp  = {.data = buf, .len = strcspn(buf, "\r\n")};
-        String name = intern_get(&table->intern, string_trim_space(tmp));
-        const Type_Info *info = type_info_table_get(table, name);
+        String name = string_trim_space(tmp);
+        const Type_Info *info = parse_type(table, name);
         if (info != NULL) {
             printfln(STRING_QFMTSPEC ": {pointee = %p, id = %i, modifier = %i}",
                 expand(name),
