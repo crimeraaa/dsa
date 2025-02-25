@@ -88,9 +88,9 @@ string_trim_left_fn(String text, bool (*callback)(char ch))
 String
 string_trim_right_fn(String text, bool (*callback)(char ch))
 {
-    size_t index = string_last_index_fn(text, callback, false);
-    if (index == STRING_NOT_FOUND)
-        index = 0;
+    // If `index` is `STRING_NOT_FOUND`, adding 1 will overflow to 0.
+    // We want this so we can return an empty string in such a case.
+    size_t index = string_last_index_fn(text, callback, false) + 1;
     return string_slice(text, 0, index);
 }
 

@@ -39,13 +39,6 @@ typedef enum {
     TYPEMOD_COMPLEX,  // Only valid for floating-point types.
 } Type_Modifier;
 
-typedef enum {
-    TYPEQUAL_CONST    = 1 << 0,
-    TYPEQUAL_VOLATILE = 1 << 1,
-    TYPEQUAL_REGISTER = 1 << 2,
-    TYPEQUAL_RESTRICT = 1 << 3,
-} Type_Qualifier;
-
 typedef struct Type_Info Type_Info;
 struct Type_Info {
     Type_Id          id;
