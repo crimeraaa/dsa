@@ -29,7 +29,7 @@ run_interactive(Intern *intern)
         String interned = intern_get(intern, key);
         printfln(STRING_QFMTSPEC " @ %p", expand(interned), cast(void *)interned.data);
 
-        for (String state = interned, it; string_split_iterator(&state, &it, ' '); ) {
+        for (String state = interned, it; string_split_char_iterator(&state, &it, ' '); ) {
             printfln("\t- " STRING_QFMTSPEC, expand(it));
         }
     }
@@ -44,7 +44,7 @@ _intern_input(Intern *intern, String input)
         // We never read `line` within `string_split_lines_iterator`, so we
         // should be able to mutate it however we want without invalidating the
         // outer loop.
-        for (String word; string_split_iterator(&line, &word, ' ');) {
+        for (String word; string_split_char_iterator(&line, &word, ' ');) {
             intern_get(intern, word);
         }
     }

@@ -18,12 +18,13 @@ struct Intern_Entry {
 Intern
 intern_make(Allocator allocator)
 {
-    Intern intern;
-    intern.allocator = allocator;
-    intern.entries   = NULL;
-    intern.count     = 0;
-    intern.cap       = 0;
-    intern.max_probe = 0;
+    Intern intern = {
+        .allocator = allocator,
+        .entries   = NULL,
+        .count     = 0,
+        .cap       = 0,
+        .max_probe = 0,
+    };
     return intern;
 }
 
@@ -153,7 +154,7 @@ swap(Intern_Entry *a, Intern_Entry *b)
 #define LF_DENOMINATOR  4
 
 static Intern_Entry *
-_intern_set(Intern *intern, String string)
+_intern_set(Intern *intern, String text)
 {
     size_t cap = intern->cap;
 
@@ -169,19 +170,19 @@ _intern_set(Intern *intern, String string)
 
     // Add 1 for nul terminator.
     Intern_String *value = cast(Intern_String *)mem_rawnew(
-        sizeof(*value) + sizeof(value->data[0]) * (string.len + 1),
+        sizeof(*value) + sizeof(value->data[0]) * (text.len + 1),
         alignof(Intern_String), // alignof(*value) is an extension MSVC doesn't have
         intern->allocator
     );
 
-    value->len = string.len;
-    memcpy(value->data, string.data, string.len);
-    value->data[string.len] = '\0';
+    value->len = text.len;
+    memcpy(value->data, text.data, text.len);
+    value->data[value->len] = '\0';
 
     // VERY important we point to the heap-allocated data, not `string.data`!
     Intern_Entry entry = {
-        .key   = {.data = value->data, .len = string.len},
-        .hash  = fnv_hash(string),
+        .key   = {.data = value->data, .len = value->len},
+        .hash  = fnv_hash(text),
         .probe = 0,
         .value = value
     };
@@ -208,16 +209,23 @@ _intern_set(Intern *intern, String string)
 }
 
 String
-intern_get(Intern *intern, String string)
+intern_get(Intern *intern, String text)
 {
     int           probe; // Only needed to avoid NULL checks in `_intern_get()`.
-    Intern_Entry *entry = _intern_get(intern->entries, intern->cap, string, &probe);
+    Intern_Entry *entry = _intern_get(intern->entries, intern->cap, text, &probe);
     // If not yet interned, do so now.
     if (entry == NULL || entry->value == NULL)
-        entry = _intern_set(intern, string);
+        entry = _intern_set(intern, text);
 
     // key already points to the interned value.
     return entry->key;
+}
+
+const char *
+intern_get_cstring(Intern *intern, String text)
+{
+    // Each interned string is also nul-terminated.
+    return intern_get(intern, text).data;
 }
 
 void

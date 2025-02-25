@@ -36,6 +36,9 @@ intern_destroy(Intern *intern);
 String
 intern_get(Intern *intern, String string);
 
+const char *
+intern_get_cstring(Intern *intern, String text);
+
 void
 intern_print(const Intern *intern, FILE *stream);
 

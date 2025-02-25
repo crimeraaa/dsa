@@ -85,7 +85,7 @@ size_t
 string_index_any_string(String haystack, String needle)
 {
     for (size_t j = 0; j < needle.len; ++j) {
-        size_t i = string_index(haystack, needle.data[j]);
+        size_t i = string_index_char(haystack, needle.data[j]);
         if (i != STRING_NOT_FOUND)
             return i;
     }
