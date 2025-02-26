@@ -19,6 +19,30 @@ heap_allocator_fn(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t old
     case ALLOCATOR_MALLOC:
     case ALLOCATOR_MRESIZE: {
         void *new_ptr = realloc(old_ptr, new_size);
+        // If `realloc` fails, `old_ptr` is not freed.
+        if (new_ptr == NULL)
+            free(old_ptr);
+        return new_ptr;
+    }
+    case ALLOCATOR_MFREE: {
+        free(old_ptr);
+        return NULL;
+    }
+    default:
+        __builtin_unreachable();
+    }
+}
+
+static void *
+panic_allocator_fn(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t old_size, size_t new_size, size_t align)
+{
+    unused(user_ptr);
+    unused(old_size);
+    unused(align);
+    switch (mode) {
+    case ALLOCATOR_MALLOC:
+    case ALLOCATOR_MRESIZE: {
+        void *new_ptr = realloc(old_ptr, new_size);
         assert(new_ptr != NULL);
         return new_ptr;
     }
@@ -52,8 +76,9 @@ nil_allocator_fn(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t old_
 }
 
 const Allocator
-HEAP_ALLOCATOR = {&heap_allocator_fn, NULL},
-NIL_ALLOCATOR  = {&nil_allocator_fn, NULL};
+HEAP_ALLOCATOR  = {&heap_allocator_fn, NULL},
+PANIC_ALLOCATOR = {&panic_allocator_fn, NULL},
+NIL_ALLOCATOR   = {&nil_allocator_fn, NULL};
 
 void *
 mem_new(size_t size, size_t align, Allocator allocator)

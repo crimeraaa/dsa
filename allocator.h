@@ -21,6 +21,7 @@ typedef struct {
 
 extern const Allocator
 HEAP_ALLOCATOR,
+PANIC_ALLOCATOR,
 NIL_ALLOCATOR;
 
 

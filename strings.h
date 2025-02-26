@@ -2,6 +2,7 @@
 #define STRINGS_H
 
 #include "common.h"
+#include "allocator.h"
 
 typedef struct {
     const char *data;
@@ -138,5 +139,40 @@ _Generic((needle),                                                             \
 )(haystack, needle)
 
 #endif // __STDC__VERSION__ == 201112L
+
+// STRING BUILDER ---------------------------------------------------------- {{{
+
+typedef struct {
+    Allocator allocator;
+    char     *buffer;
+    size_t    len;
+    size_t    cap;
+} String_Builder;
+
+String_Builder
+string_builder_make(Allocator allocator);
+
+String_Builder
+string_builder_make_fixed(char *buffer, size_t cap);
+
+void
+string_builder_reset(String_Builder *builder);
+
+bool
+string_builder_append_char(String_Builder *builder, char ch);
+
+bool
+string_builder_append_string(String_Builder *builder, String text);
+
+bool
+string_builder_append_cstring(String_Builder *builder, const char *text);
+
+String
+string_builder_to_string(String_Builder *builder);
+
+const char *
+string_builder_to_cstring(String_Builder *builder);
+
+// }}} -------------------------------------------------------------------------
 
 #endif // STRINGS_H

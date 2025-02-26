@@ -3,6 +3,36 @@
 #include <string.h> // memset
 #include <stdint.h> // uint32_t
 
+#define lit string_literal
+
+const String
+TYPE_BASE_STRINGS[TYPE_BASE_COUNT] = {
+    [TYPE_BASE_NONE]        = {NULL, 0},
+    [TYPE_BASE_VOID]        = lit("void"),
+
+    [TYPE_BASE_CHAR]        = lit("char"),
+    [TYPE_BASE_SHORT]       = lit("short"),
+    [TYPE_BASE_INT]         = lit("int"),
+    [TYPE_BASE_LONG]        = lit("long"),
+    [TYPE_BASE_LONG_LONG]   = lit("long long"),
+
+    [TYPE_BASE_FLOAT]       = lit("float"),
+    [TYPE_BASE_DOUBLE]      = lit("double"),
+
+    [TYPE_BASE_STRUCT]      = lit("struct"),
+    [TYPE_BASE_ENUM]        = lit("enum"),
+    [TYPE_BASE_UNION]       = lit("union"),
+
+    [TYPE_BASE_POINTER]     = {NULL, 0},
+},
+
+TYPE_MOD_STRINGS[TYPE_MOD_COUNT] = {
+    [TYPE_MOD_NONE]         = {NULL, 0},
+    [TYPE_MOD_SIGNED]       = lit("signed"),
+    [TYPE_MOD_UNSIGNED]     = lit("unsigned"),
+    [TYPE_MOD_COMPLEX]      = lit("complex"),
+};
+
 Type_Info_Table
 type_info_table_make(Allocator allocator)
 {
@@ -48,7 +78,7 @@ _find_entry(Type_Info_Table_Entry *entries, size_t cap, const Intern_String *key
     __builtin_unreachable();
 }
 
-void
+bool
 _reserve(Type_Info_Table *table, size_t new_cap)
 {
     Allocator allocator = table->intern.allocator;
@@ -57,6 +87,8 @@ _reserve(Type_Info_Table *table, size_t new_cap)
     size_t old_cap = table->cap;
 
     Type_Info_Table_Entry *new_entries = mem_make(Type_Info_Table_Entry, new_cap, allocator);
+    if (new_entries == NULL)
+        return false;
     
     memset(new_entries, 0, sizeof(new_entries[0]) * new_cap);
 
@@ -74,10 +106,10 @@ _reserve(Type_Info_Table *table, size_t new_cap)
     table->entries = new_entries;
     table->count   = new_count;
     table->cap     = new_cap;
-
+    return true;
 }
 
-const Type_Info *
+bool
 type_info_table_add(Type_Info_Table *table, String name, Type_Info info)
 {
     if (table->count >= (table->cap * 3) / 4) {
@@ -90,29 +122,28 @@ type_info_table_add(Type_Info_Table *table, String name, Type_Info info)
     ++table->count;
     entry->name = key;
     entry->info = info;
-    return &entry->info;
+    return true;
 }
 
-const Type_Info *
+bool
 type_info_table_new_alias(Type_Info_Table *table, String name, String alias)
 {
-    const Type_Info *info = type_info_table_get(table, name);
+    Type_Info info;
     // `name` doesn't exist to begin with?
-    if (info == NULL)
-        return NULL;
+    if (!type_info_table_get(table, name, &info))
+        return false;
     else
-        return type_info_table_add(table, alias, *info);
+        return type_info_table_add(table, alias, info);
 }
 
-const Type_Info *
-type_info_table_get(Type_Info_Table *table, String name)
+bool
+type_info_table_get(Type_Info_Table *table, String name, Type_Info *out_info)
 {
     const Intern_String   *key   = intern_get_interned(&table->intern, name);
     Type_Info_Table_Entry *entry = _find_entry(table->entries, table->cap, key);
-    if (entry == NULL || entry->name == NULL)
-        return NULL;
-    else
-        return &entry->info;
+    if (out_info != NULL)
+        *out_info = entry->info;
+    return entry != NULL && entry->name != NULL;
 }
 
 void
@@ -127,9 +158,8 @@ type_info_table_print(const Type_Info_Table *table, FILE *stream)
             fputc('\n', stream);
             continue;
         }
-        fprintfln(stream, "\"%s\": {pointee = %p, base = %i, modifier = %i}",
+        fprintfln(stream, "\"%s\": {base = %i, modifier = %i}",
             entries[i].name->data,
-            cast(void *)entries[i].info.pointee,
             entries[i].info.base,
             entries[i].info.modifier
         );

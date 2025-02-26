@@ -30,12 +30,7 @@ typedef enum {
     TYPE_BASE_POINTER,
 } Type_Base;
 
-#define TYPE_BASE_COUNT    (TYPE_BASE_POINTER + 1)
-
-extern const String
-TYPE_BASE_STRINGS[TYPE_BASE_COUNT];
-
-// Save for `TYPEMOD_NONE`, each of these is mutually exclusive.
+// Save for `TYPE_MOD_NONE`, each of these is mutually exclusive.
 typedef enum {
     TYPE_MOD_NONE,     // This is the default for most types.
     TYPE_MOD_SIGNED,   // Only valid for integer types. Default for `short`, `int`, `long` and `long long`.
@@ -43,11 +38,17 @@ typedef enum {
     TYPE_MOD_COMPLEX,  // Only valid for floating-point types.
 } Type_Modifier;
 
+#define TYPE_BASE_COUNT (TYPE_BASE_POINTER + 1)
+#define TYPE_MOD_COUNT  (TYPE_MOD_COMPLEX + 1)
+
+extern const String
+TYPE_BASE_STRINGS[TYPE_BASE_COUNT],
+TYPE_MOD_STRINGS[TYPE_MOD_COUNT];
+
 typedef struct Type_Info Type_Info;
 struct Type_Info {
-    Type_Base        base;
-    Type_Modifier    modifier;
-    const Type_Info *pointee; // If non-null, this helps us resolve the pointer type.
+    Type_Base     base;
+    Type_Modifier modifier;
 };
 
 typedef struct {
@@ -68,14 +69,14 @@ type_info_table_make(Allocator allocator);
 void
 type_info_table_destroy(Type_Info_Table *table);
 
-const Type_Info *
+bool
 type_info_table_add(Type_Info_Table *table, String name, Type_Info info);
 
-const Type_Info *
+bool
 type_info_table_new_alias(Type_Info_Table *table, String name, String alias);
 
-const Type_Info *
-type_info_table_get(Type_Info_Table *table, String name);
+bool
+type_info_table_get(Type_Info_Table *table, String name, Type_Info *out_info);
 
 void
 type_info_table_print(const Type_Info_Table *table, FILE *stream);

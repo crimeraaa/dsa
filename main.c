@@ -6,10 +6,10 @@
 #include "types.h"
 
 
-#define NEW_SIGNED(type_base)   {.base = (type_base), .modifier = TYPE_MOD_SIGNED,   .pointee = NULL,}
-#define NEW_UNSIGNED(type_base) {.base = (type_base), .modifier = TYPE_MOD_UNSIGNED, .pointee = NULL,}
-#define NEW_TYPE(type_base)     {.base = (type_base), .modifier = TYPE_MOD_NONE,     .pointee = NULL,}
-#define NEW_COMPLEX(type_base)  {.base = (type_base), .modifier = TYPE_MOD_COMPLEX,  .pointee = NULL,}
+#define NEW_SIGNED(type_base)   {.base = (type_base), .modifier = TYPE_MOD_SIGNED}
+#define NEW_UNSIGNED(type_base) {.base = (type_base), .modifier = TYPE_MOD_UNSIGNED}
+#define NEW_TYPE(type_base)     {.base = (type_base), .modifier = TYPE_MOD_NONE}
+#define NEW_COMPLEX(type_base)  {.base = (type_base), .modifier = TYPE_MOD_COMPLEX}
 
 #define expand   string_expand
 #define literal  string_literal
@@ -55,9 +55,9 @@ initialize_types(Type_Info_Table *table)
 }
 
 static bool
-set_type_id(Type_Info *info, Type_Base base, String word, String type)
+set_type_id(Type_Info *info, Type_Base base, String word)
 {
-    if (string_eq(word, type)) {
+    if (string_eq(word, TYPE_BASE_STRINGS[base])) {
         // Was previously set?
         if (info->base != TYPE_BASE_NONE)
             return false;
@@ -68,14 +68,14 @@ set_type_id(Type_Info *info, Type_Base base, String word, String type)
 }
 
 static bool
-set_type_mod(Type_Info *info, Type_Modifier mod, String word, String modstr)
+set_type_mod(Type_Info *info, Type_Modifier modifier, String word)
 {
-    if (string_eq(word, modstr)) {
+    if (string_eq(word, TYPE_MOD_STRINGS[modifier])) {
         // Was previously set?
         if (info->modifier != TYPE_MOD_NONE)
             return false;
 
-        info->modifier = mod;
+        info->modifier = modifier;
     }
     return true;
 }
@@ -106,27 +106,26 @@ resolve_type(Type_Info *info)
 
 #define WHITESPACE  literal(" \r\n\t\v\f")
 
-static const Type_Info *
-parse_type(Type_Info_Table *table, String type)
+static bool
+parse_type(Type_Info_Table *table, String type, Type_Info *out_info)
 {
     // This type already exists and is valid?
-    const Type_Info *_info = type_info_table_get(table, type);
-    if (_info != NULL)
-        return _info;
+    if (type_info_table_get(table, type, out_info))
+        return true;
 
     // Parse the string `type` and generate a query from it.
-    Type_Info info = {.base = TYPE_BASE_NONE, .modifier = TYPE_MOD_NONE, .pointee = NULL};
+    Type_Info info = NEW_TYPE(TYPE_BASE_NONE);
     for (String state = type, word; string_split_any_string_iterator(&state, &word, WHITESPACE);) {
         switch (word.data[0]) {
         case 'c': {
-            if (!set_type_id(&info, TYPE_BASE_CHAR, word, literal("char")))
+            if (!set_type_id(&info, TYPE_BASE_CHAR, word))
                 return NULL;
-            if (!set_type_mod(&info, TYPE_MOD_COMPLEX, word, literal("complex")))
+            if (!set_type_mod(&info, TYPE_MOD_COMPLEX, word))
                 return NULL;
             break;
         }
         case 'i':
-            if (!set_type_id(&info, TYPE_BASE_INT, word, literal("int"))) {
+            if (!set_type_id(&info, TYPE_BASE_INT, word)) {
                 // `long int` and `long long int` are valid.
                 if (info.base == TYPE_BASE_LONG || info.base == TYPE_BASE_LONG_LONG)
                     continue;
@@ -134,7 +133,7 @@ parse_type(Type_Info_Table *table, String type)
             }
             break;
         case 'l':
-            if (!set_type_id(&info, TYPE_BASE_LONG, word, literal("long"))) {
+            if (!set_type_id(&info, TYPE_BASE_LONG, word)) {
                 // Do not error out on `int long`.
                 if (info.base == TYPE_BASE_INT) {
                     info.base = TYPE_BASE_LONG;
@@ -149,68 +148,38 @@ parse_type(Type_Info_Table *table, String type)
             }
             break;
         case 's':
-            if (!set_type_id(&info, TYPE_BASE_SHORT, word, literal("short")))
+            if (!set_type_id(&info, TYPE_BASE_SHORT, word))
                 return NULL;
-            if (!set_type_mod(&info, TYPE_MOD_SIGNED, word, literal("signed")))
+            if (!set_type_mod(&info, TYPE_MOD_SIGNED, word))
                 return NULL;
             break;
         case 'u':
-            if (!set_type_mod(&info, TYPE_MOD_UNSIGNED, word, literal("unsigned")))
+            if (!set_type_mod(&info, TYPE_MOD_UNSIGNED, word))
                 return NULL;
             break;
         case 'v':
-            if (!set_type_id(&info, TYPE_BASE_VOID, word, literal("void")))
+            if (!set_type_id(&info, TYPE_BASE_VOID, word))
                 return NULL;
             break;
         }
     }
     
     
-    char   buf[512];
-    char  *start = buf;
-    size_t rem   = sizeof(buf);
-    int    len   = 0;
-    
+    char buf[512];
+    String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
     resolve_type(&info);
-    switch (info.modifier) {
-    case TYPE_MOD_NONE:
-        break;
-    case TYPE_MOD_SIGNED:
-        len += snprintf(start, rem, "signed ");
-        break;
-    case TYPE_MOD_UNSIGNED:
-        len += snprintf(start, rem, "unsigned ");
-        break;
-    case TYPE_MOD_COMPLEX:
-        len += snprintf(start, rem, "complex ");
-        break;
-    }
+    string_builder_append_string(&builder, TYPE_MOD_STRINGS[info.modifier]);
     
-    start += len;
-    rem   -= cast(size_t)len;
+    // If we had `TYPE_BASE_NONE` with `TYPE_MOD_SIGNED` (e.g. "signed"), we
+    // should have resolved to `TYPE_BASE_INT` with `TYPE_MOD_NONE`.
+    if (info.modifier != TYPE_MOD_NONE)
+        string_builder_append_char(&builder, ' ');
+    string_builder_append_string(&builder, TYPE_BASE_STRINGS[info.base]);
 
-    switch (info.base) {
-    case TYPE_BASE_VOID:       len += snprintf(start, rem, "void"); break;
-    case TYPE_BASE_CHAR:       len += snprintf(start, rem, "char"); break;
-    case TYPE_BASE_SHORT:      len += snprintf(start, rem, "short"); break;
-    case TYPE_BASE_INT:        len += snprintf(start, rem, "int"); break;
-    case TYPE_BASE_LONG:       len += snprintf(start, rem, "long"); break;
-    case TYPE_BASE_LONG_LONG:  len += snprintf(start, rem, "long long"); break;
-
-    case TYPE_BASE_FLOAT:      len += snprintf(start, rem, "float"); break;
-    case TYPE_BASE_DOUBLE:     len += snprintf(start, rem, "double"); break;
-    case TYPE_BASE_ENUM:       len += snprintf(start, rem, "enum"); break;
-    case TYPE_BASE_STRUCT:     len += snprintf(start, rem, "struct"); break;
-    case TYPE_BASE_UNION:      len += snprintf(start, rem, "union"); break;
-    case TYPE_BASE_POINTER:    len += snprintf(start, rem, "*"); break;
-        
-    default:
-        break;
-    }
-    
-    String query = {buf, cast(size_t)len};
-    printfln("Query: " STRING_QFMTSPEC, expand(query));
-    return type_info_table_get(table, query);
+    // Testing if we already nul-terminated it
+    const char *query = string_builder_to_cstring(&builder);
+    printfln("Query: \'%s\'", query);
+    return type_info_table_get(table, string_from_cstring(query), out_info);
 }
 
 static void
@@ -224,15 +193,14 @@ run_interactive(Type_Info_Table *table)
             break;
         }
         
-        String tmp  = {.data = buf, .len = strcspn(buf, "\r\n")};
-        String name = string_trim_space(tmp);
-        const Type_Info *info = parse_type(table, name);
-        if (info != NULL) {
-            printfln(STRING_QFMTSPEC ": {pointee = %p, base = %i, modifier = %i}",
+        String    tmp  = {.data = buf, .len = strcspn(buf, "\r\n")};
+        String    name = string_trim_space(tmp);
+        Type_Info info;
+        if (parse_type(table, name, &info)) {
+            printfln(STRING_QFMTSPEC ": {base = %i, modifier = %i}",
                 expand(name),
-                cast(void *)info->pointee,
-                info->base,
-                info->modifier
+                info.base,
+                info.modifier
             );
         } else {
             printfln("Invalid type " STRING_QFMTSPEC ".", expand(name));
@@ -247,7 +215,7 @@ main(int argc, char *argv[])
     unused(argc);
     unused(argv);
     
-    Type_Info_Table table = type_info_table_make(HEAP_ALLOCATOR);
+    Type_Info_Table table = type_info_table_make(PANIC_ALLOCATOR);
     initialize_types(&table);
     run_interactive(&table);
     type_info_table_destroy(&table);

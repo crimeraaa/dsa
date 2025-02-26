@@ -4,8 +4,8 @@
 #include <stdio.h>  // fprintf
 
 struct Intern_Entry {
-    int            probe; // Our distance from our ideal position `hash % cap`.
     Intern_String *value;
+    int            probe; // Our distance from our ideal position `hash % cap`.
 };
 
 Intern
@@ -92,11 +92,13 @@ _intern_update_max_probe(Intern *intern, int probe)
         intern->max_probe = probe;
 }
 
-static void
+static bool
 _intern_resize(Intern *intern, size_t new_cap)
 {
     Allocator     allocator   = intern->allocator;
     Intern_Entry *new_entries = mem_make(Intern_Entry, new_cap, allocator);
+    if (new_entries == NULL)
+        return false;
 
     // Zero out the new memory so that we can safely read them.
     memset(new_entries, 0, sizeof(new_entries[0]) * new_cap);
@@ -129,6 +131,7 @@ _intern_resize(Intern *intern, size_t new_cap)
     intern->entries = new_entries;
     intern->count   = new_count;
     intern->cap     = new_cap;
+    return true;
 }
 
 static void
@@ -164,13 +167,16 @@ _intern_set(Intern *intern, String text, uint32_t hash)
         alignof(Intern_String), // alignof(*value) is an extension MSVC doesn't have
         intern->allocator
     );
+    
+    if (value == NULL)
+        return NULL;
 
     value->len  = text.len;
     value->hash = hash;
     value->data[value->len] = '\0';
     memcpy(value->data, text.data, text.len);
 
-    Intern_Entry  entry   = {.probe = 0, .value = value};
+    Intern_Entry  entry   = {.value = value, .probe = 0};
     Intern_Entry *entries = intern->entries;
 
     // Yes this is basically copy-pasting `_intern_get()`, but we need to add
