@@ -18,9 +18,9 @@ for (size_t idx = 0, _end_ = (string).len; idx < _end_; ++idx)
 
 // C99 compound literals have VERY different semantics in C++.
 #ifdef __cplusplus
-#define string_from_literal(literall)   {literal, sizeof(literal) - 1}
+#define string_literal(literall)    {literal, sizeof(literal) - 1}
 #else // !__cplusplus
-#define string_from_literal(literal)    (String){literal, sizeof(literal) - 1}
+#define string_literal(literal)     (String){literal, sizeof(literal) - 1}
 #endif // __cplusplus
 
 #define STRING_FMTSPEC      "%.*s"

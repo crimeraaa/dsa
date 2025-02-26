@@ -20,6 +20,10 @@
 #define printfln(fmt, ...)  printf(fmt "\n", __VA_ARGS__)
 #define println(msg)        printfln("%s", msg)
 
+#define fprint(stream, msg)         fprintf(stream, "%s", msg)
+#define fprintfln(stream, fmt, ...) fprintf(stream, fmt "\n", __VA_ARGS__)
+#define fprintln(stream, msg)       fprintfln(stream, "%s", msg)
+
 #define eprintf(fmt, ...)   fprintf(stderr, fmt, __VA_ARGS__)
 #define eprint(msg)         eprintf("%s", msg)
 #define eprintfln(fmt, ...) eprintf(fmt "\n", __VA_ARGS__)

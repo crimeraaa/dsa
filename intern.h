@@ -21,6 +21,7 @@ typedef struct {
 
 typedef struct {
     size_t   len;
+    uint32_t hash;
     char     data[];
 } Intern_String;
 
@@ -43,6 +44,18 @@ intern_get(Intern *intern, String string);
 
 const char *
 intern_get_cstring(Intern *intern, String text);
+
+/**
+ * @note
+ *      Same semantics as `intern_get` and `intern_get_cstring`.
+ *      If `text` is not already interned, we will intern it.
+ *
+ * @note
+ *      Pointers are directly comparable. That is:
+ *      `intern_get_interned("Hello") == intern_get_interned("Hello")`.
+ */
+const Intern_String *
+intern_get_interned(Intern *intern, String text);
 
 void
 intern_print(const Intern *intern, FILE *stream);
