@@ -33,10 +33,10 @@ TYPE_MOD_STRINGS[TYPE_MOD_COUNT] = {
     [TYPE_MOD_COMPLEX]      = lit("complex"),
 };
 
-Type_Info_Table
-type_info_table_make(Allocator allocator)
+Type_Table
+type_table_make(Allocator allocator)
 {
-    Type_Info_Table table = {
+    Type_Table table = {
         .intern    = intern_make(allocator),
         .entries   = NULL,
         .count     = 0,
@@ -46,11 +46,11 @@ type_info_table_make(Allocator allocator)
 }
 
 void
-type_info_table_destroy(Type_Info_Table *table)
+type_table_destroy(Type_Table *table)
 {
     Intern   *intern    = &table->intern;
     Allocator allocator = intern->allocator;
-    
+
     mem_delete(table->entries, table->cap, allocator);
     intern_destroy(intern);
     table->entries = NULL;
@@ -59,18 +59,18 @@ type_info_table_destroy(Type_Info_Table *table)
 }
 
 // Finds the first free entry or the entry itself.
-static Type_Info_Table_Entry *
-_find_entry(Type_Info_Table_Entry *entries, size_t cap, const Intern_String *key)
+static Type_Table_Entry *
+_find_entry(Type_Table_Entry *entries, size_t cap, const Intern_String *key)
 {
     // Division (and, by extension, modulo) by 0 is undefined behavior.
     if (cap == 0)
         return NULL;
-    
+
     for (size_t i = cast(size_t)key->hash % cap; /* empty */; i = (i + 1) % cap) {
         // This entry is free!
         if (entries[i].name == NULL)
             return &entries[i];
-        
+
         // We found the entry we were looking for.
         if (key == entries[i].name)
             return &entries[i];
@@ -79,29 +79,29 @@ _find_entry(Type_Info_Table_Entry *entries, size_t cap, const Intern_String *key
 }
 
 bool
-_reserve(Type_Info_Table *table, size_t new_cap)
+_reserve(Type_Table *table, size_t new_cap)
 {
     Allocator allocator = table->intern.allocator;
 
-    Type_Info_Table_Entry *old_entries = table->entries;
+    Type_Table_Entry *old_entries = table->entries;
     size_t old_cap = table->cap;
 
-    Type_Info_Table_Entry *new_entries = mem_make(Type_Info_Table_Entry, new_cap, allocator);
+    Type_Table_Entry *new_entries = mem_make(Type_Table_Entry, new_cap, allocator);
     if (new_entries == NULL)
         return false;
-    
+
     memset(new_entries, 0, sizeof(new_entries[0]) * new_cap);
 
     size_t new_count = 0;
     for (size_t i = 0; i < old_cap; ++i) {
         if (old_entries[i].name == NULL)
             continue;
-        
+
         *_find_entry(new_entries, new_cap, old_entries[i].name) = old_entries[i];
         ++new_count;
     }
-    
-    
+
+
     mem_delete(old_entries, old_cap, allocator);
     table->entries = new_entries;
     table->count   = new_count;
@@ -109,49 +109,51 @@ _reserve(Type_Info_Table *table, size_t new_cap)
     return true;
 }
 
-bool
-type_info_table_add(Type_Info_Table *table, String name, Type_Info info)
+Type_Table_Error
+type_table_add(Type_Table *table, String name, Type_Info info)
 {
     if (table->count >= (table->cap * 3) / 4) {
         size_t new_cap = (table->cap == 0) ? 8 : table->cap * 2;
-        _reserve(table, new_cap);
+        if (!_reserve(table, new_cap))
+            return TYPE_TABLE_NOMEM;
     }
-    
-    const Intern_String   *key   = intern_get_interned(&table->intern, name);
-    Type_Info_Table_Entry *entry = _find_entry(table->entries, table->cap, key);
+
+    const Intern_String *key   = intern_get_interned(&table->intern, name);
+    Type_Table_Entry    *entry = _find_entry(table->entries, table->cap, key);
     ++table->count;
     entry->name = key;
     entry->info = info;
-    return true;
+    return TYPE_TABLE_OK;
 }
 
-bool
-type_info_table_new_alias(Type_Info_Table *table, String name, String alias)
+Type_Table_Error
+type_table_new_alias(Type_Table *table, String name, String alias, Type_Info *out_info)
 {
-    Type_Info info;
-    // `name` doesn't exist to begin with?
-    if (!type_info_table_get(table, name, &info))
-        return false;
-    else
-        return type_info_table_add(table, alias, info);
+    Type_Table_Error err = type_table_get(table, name, out_info);
+    // `name` actually exists in the table?
+    if (err == TYPE_TABLE_OK)
+        err = type_table_add(table, alias, *out_info);
+    return err;
 }
 
-bool
-type_info_table_get(Type_Info_Table *table, String name, Type_Info *out_info)
+Type_Table_Error
+type_table_get(Type_Table *table, String name, Type_Info *out_info)
 {
-    const Intern_String   *key   = intern_get_interned(&table->intern, name);
-    Type_Info_Table_Entry *entry = _find_entry(table->entries, table->cap, key);
-    if (out_info != NULL)
+    const Intern_String *key   = intern_get_interned(&table->intern, name);
+    Type_Table_Entry    *entry = _find_entry(table->entries, table->cap, key);
+    if (entry != NULL && entry->name != NULL) {
         *out_info = entry->info;
-    return entry != NULL && entry->name != NULL;
+        return TYPE_TABLE_OK;
+    }
+    return TYPE_TABLE_NOKEY;
 }
 
 void
-type_info_table_print(const Type_Info_Table *table, FILE *stream)
+type_table_print(const Type_Table *table, FILE *stream)
 {
     size_t cap = table->cap;
     fprintln(stream, "[TYPE INFO]");
-    const Type_Info_Table_Entry *entries = table->entries;
+    const Type_Table_Entry *entries = table->entries;
     for (size_t i = 0; i < cap; ++i) {
         fprintf(stream, "\t[%zu]: ", i);
         if (entries[i].name == NULL) {

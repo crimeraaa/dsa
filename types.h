@@ -9,8 +9,9 @@
 #include <stdint.h>
 
 typedef enum {
-    // Mainly used for `signed`, `unsigned` and `complex` when used as-is.
-    // Notably, this is distinct from `void`.
+    // Mainly used as a holding type for `signed`, `unsigned` and `complex` when
+    // parsing as-is. Notably, this is distinct from `void`. In other contexts
+    // this represents an invalid type.
     TYPE_BASE_NONE,
 
     // Miscallenous Types: void
@@ -51,34 +52,43 @@ struct Type_Info {
     Type_Modifier modifier;
 };
 
+/**
+ * TODO: Use the `info` member as our hash/ID. Only use `name` for user-defined types.
+ */
 typedef struct {
     const Intern_String *name;
     Type_Info            info;
-} Type_Info_Table_Entry;
+} Type_Table_Entry;
 
 typedef struct {
     Intern                 intern; // Also contains the allocator.
-    Type_Info_Table_Entry *entries;
+    Type_Table_Entry *entries;
     size_t                 count;
     size_t                 cap;
-} Type_Info_Table;
+} Type_Table;
 
-Type_Info_Table
-type_info_table_make(Allocator allocator);
+typedef enum {
+    TYPE_TABLE_OK,
+    TYPE_TABLE_NOMEM, // Memory error?
+    TYPE_TABLE_NOKEY, // Key doesn't exist?
+} Type_Table_Error;
 
-void
-type_info_table_destroy(Type_Info_Table *table);
-
-bool
-type_info_table_add(Type_Info_Table *table, String name, Type_Info info);
-
-bool
-type_info_table_new_alias(Type_Info_Table *table, String name, String alias);
-
-bool
-type_info_table_get(Type_Info_Table *table, String name, Type_Info *out_info);
+Type_Table
+type_table_make(Allocator allocator);
 
 void
-type_info_table_print(const Type_Info_Table *table, FILE *stream);
+type_table_destroy(Type_Table *table);
+
+Type_Table_Error
+type_table_add(Type_Table *table, String name, Type_Info info);
+
+Type_Table_Error
+type_table_get(Type_Table *table, String name, Type_Info *out_info);
+
+Type_Table_Error
+type_table_new_alias(Type_Table *table, String name, String alias, Type_Info *out_info);
+
+void
+type_table_print(const Type_Table *table, FILE *stream);
 
 #endif // TYPES_H

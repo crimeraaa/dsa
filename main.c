@@ -43,15 +43,15 @@ static const struct {
 };
 
 static void
-initialize_types(Type_Info_Table *table)
+initialize_types(Type_Table *table)
 {
     for (size_t i = 0; i < count_of(TYPES); ++i) {
         String    name = {TYPES[i].name, strlen(TYPES[i].name)};
         Type_Info info = TYPES[i].info;
-        type_info_table_add(table, name, info);
+        type_table_add(table, name, info);
     }
 
-    type_info_table_print(table, stdout);
+    type_table_print(table, stdout);
 }
 
 static bool
@@ -104,24 +104,32 @@ resolve_type(Type_Info *info)
     }
 }
 
-#define WHITESPACE  literal(" \r\n\t\v\f")
-
 static bool
-parse_type(Type_Info_Table *table, String type, Type_Info *out_info)
+parse_type(Type_Table *table, String type, Type_Info *out_info)
 {
     // This type already exists and is valid?
-    if (type_info_table_get(table, type, out_info))
+    if (type_table_get(table, type, out_info) == TYPE_TABLE_OK)
         return true;
-
+    
     // Parse the string `type` and generate a query from it.
-    Type_Info info = NEW_TYPE(TYPE_BASE_NONE);
-    for (String state = type, word; string_split_any_string_iterator(&state, &word, WHITESPACE);) {
+    Type_Info info = {.base = TYPE_BASE_NONE, .modifier = TYPE_MOD_NONE};
+    for (String state = type, word; string_split_whitespace_iterator(&state, &word);) {
         switch (word.data[0]) {
         case 'c': {
             if (!set_type_id(&info, TYPE_BASE_CHAR, word))
-                return NULL;
+                return false;
             if (!set_type_mod(&info, TYPE_MOD_COMPLEX, word))
-                return NULL;
+                return false;
+            break;
+        }
+        case 'd': {
+            if (!set_type_id(&info, TYPE_BASE_DOUBLE, word))
+                return false;
+            break;
+        }
+        case 'f': {
+            if (!set_type_id(&info, TYPE_BASE_FLOAT, word))
+                return false;
             break;
         }
         case 'i':
@@ -129,7 +137,7 @@ parse_type(Type_Info_Table *table, String type, Type_Info *out_info)
                 // `long int` and `long long int` are valid.
                 if (info.base == TYPE_BASE_LONG || info.base == TYPE_BASE_LONG_LONG)
                     continue;
-                return NULL;
+                return false;
             }
             break;
         case 'l':
@@ -144,32 +152,31 @@ parse_type(Type_Info_Table *table, String type, Type_Info *out_info)
                     info.base = TYPE_BASE_LONG_LONG;
                     continue;
                 }
-                return NULL;
+                return false;
             }
             break;
         case 's':
             if (!set_type_id(&info, TYPE_BASE_SHORT, word))
-                return NULL;
+                return false;
             if (!set_type_mod(&info, TYPE_MOD_SIGNED, word))
-                return NULL;
+                return false;
             break;
         case 'u':
             if (!set_type_mod(&info, TYPE_MOD_UNSIGNED, word))
-                return NULL;
+                return false;
             break;
         case 'v':
             if (!set_type_id(&info, TYPE_BASE_VOID, word))
-                return NULL;
+                return false;
             break;
         }
     }
-    
-    
+
     char buf[512];
     String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
     resolve_type(&info);
     string_builder_append_string(&builder, TYPE_MOD_STRINGS[info.modifier]);
-    
+
     // If we had `TYPE_BASE_NONE` with `TYPE_MOD_SIGNED` (e.g. "signed"), we
     // should have resolved to `TYPE_BASE_INT` with `TYPE_MOD_NONE`.
     if (info.modifier != TYPE_MOD_NONE)
@@ -177,13 +184,13 @@ parse_type(Type_Info_Table *table, String type, Type_Info *out_info)
     string_builder_append_string(&builder, TYPE_BASE_STRINGS[info.base]);
 
     // Testing if we already nul-terminated it
-    const char *query = string_builder_to_cstring(&builder);
-    printfln("Query: \'%s\'", query);
-    return type_info_table_get(table, string_from_cstring(query), out_info);
+    String query = string_builder_to_string(&builder);
+    printfln("Query: \'%s\'", query.data);
+    return type_table_get(table, query, out_info) == TYPE_TABLE_OK;
 }
 
 static void
-run_interactive(Type_Info_Table *table)
+run_interactive(Type_Table *table)
 {
     char buf[512];
     for (;;) {
@@ -192,7 +199,7 @@ run_interactive(Type_Info_Table *table)
             fputc('\n', stdout);
             break;
         }
-        
+
         String    tmp  = {.data = buf, .len = strcspn(buf, "\r\n")};
         String    name = string_trim_space(tmp);
         Type_Info info;
@@ -214,11 +221,11 @@ main(int argc, char *argv[])
 {
     unused(argc);
     unused(argv);
-    
-    Type_Info_Table table = type_info_table_make(PANIC_ALLOCATOR);
+
+    Type_Table table = type_table_make(PANIC_ALLOCATOR);
     initialize_types(&table);
     run_interactive(&table);
-    type_info_table_destroy(&table);
+    type_table_destroy(&table);
     
     return 0;
 }

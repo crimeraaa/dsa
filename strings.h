@@ -99,10 +99,10 @@ string_last_index_any_cstring(String haystack, const char *charset);
 // SPLIT ITERATORS --------------------------------------------------------- {{{
 
 bool
-string_split_char_iterator(String *state, String *current, char sep);
+string_split_iterator_fn(String *state, String *current, bool (*callback)(char ch));
 
 bool
-string_split_any_string_iterator(String *state, String *current, String charset);
+string_split_char_iterator(String *state, String *current, char sep);
 
 bool
 string_split_string_iterator(String *state, String *current, String sep);
@@ -112,6 +112,9 @@ string_split_cstring_iterator(String *state, String *current, const char *sep);
 
 bool
 string_split_lines_iterator(String *state, String *current);
+
+bool
+string_split_whitespace_iterator(String *state, String *current);
 
 // }}} -------------------------------------------------------------------------
 

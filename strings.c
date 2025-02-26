@@ -217,6 +217,12 @@ string_split_lines_iterator(String *state, String *current)
 }
 
 bool
+string_split_whitespace_iterator(String *state, String *current)
+{
+    return string_split_iterator_fn(state, current, &is_whitespace);
+}
+
+bool
 string_split_cstring_iterator(String *state, String *current, const char *sep)
 {
     return string_split_string_iterator(state, current, string_from_cstring(sep));
@@ -244,22 +250,22 @@ _string_split_iterator(String *state, String *current, size_t index)
 }
 
 bool
+string_split_iterator_fn(String *state, String *current, bool (*callback)(char ch))
+{
+    if (state->len == 0)
+        return false;
+        
+    size_t index = string_index_fn(*state, callback, true);
+    return _string_split_iterator(state, current, index);
+}
+
+bool
 string_split_char_iterator(String *state, String *current, char sep)
 {
     if (state->len == 0)
         return false;
 
     size_t index = string_index_char(*state, sep);
-    return _string_split_iterator(state, current, index);
-}
-
-bool
-string_split_any_string_iterator(String *state, String *current, String charset)
-{
-    if (state->len == 0)
-        return false;
-
-    size_t index = string_index_any_string(*state, charset);
     return _string_split_iterator(state, current, index);
 }
 
