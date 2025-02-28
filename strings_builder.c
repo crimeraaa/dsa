@@ -43,19 +43,21 @@ string_builder_append_char(String_Builder *builder, char ch)
 bool
 string_builder_append_string(String_Builder *builder, String text)
 {
-    size_t end = builder->len + text.len;
+    size_t len = builder->len;
+    size_t end = len + text.len;
+    size_t cap = builder->cap;
     // Need to fit resulting text along with nul termination as well.
-    if (end + 1 >= builder->cap) {
-        size_t new_cap = (builder->cap == 0) ? 8 : builder->cap * 2;
-        char  *new_buffer = mem_resize(char, builder->buffer, builder->cap, new_cap, builder->allocator);
+    if (end + 1 >= cap) {
+        size_t new_cap = (cap == 0) ? 8 : cap * 2;
+        char  *new_buffer = mem_resize(char, builder->buffer, cap, new_cap, builder->allocator);
         if (new_buffer == NULL)
             return false;
-        builder->buffer = cast(char *)memcpy(new_buffer, builder->buffer, builder->cap);
+        builder->buffer = cast(char *)memcpy(new_buffer, builder->buffer, cap);
         builder->cap    = new_cap;
     }
-    memcpy(&builder->buffer[builder->len], text.data, text.len);
+    builder->len         = end;
     builder->buffer[end] = '\0';
-    builder->len = end;
+    memcpy(&builder->buffer[len], text.data, text.len);
     return true;
 }
 
@@ -67,14 +69,14 @@ string_builder_append_cstring(String_Builder *builder, const char *text)
 
 
 String
-string_builder_to_string(String_Builder *builder)
+string_builder_to_string(const String_Builder *builder)
 {
     String result = {builder->buffer, builder->len};
     return result;
 }
 
 const char *
-string_builder_to_cstring(String_Builder *builder)
+string_builder_to_cstring(const String_Builder *builder)
 {
     return builder->buffer;
 }

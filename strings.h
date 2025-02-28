@@ -9,17 +9,31 @@ typedef struct {
     size_t      len;
 } String;
 
-#define string_for_each(ptr, string) \
-for (const char *ptr = (string).data, *const _end_ = ptr + (string).len; \
-    ptr < _end_; \
-    ++ptr)
+/**
+ * @details
+ *      The `_first_` nonsense is to allow us to create a for loop that runs
+ *      exactly only once.
+ * 
+ *      This is useful because we can't declare variables of multiple unique
+ *      types within a single statement in C (e.g. `int x = 0, float f = 1.1`).
+ * 
+ *      `char ch, *ptr = str.data, *end = ptr + str.len` is not fine because it
+ *      casts away constness!
+ * 
+ *      `const char ch, *ptr, *end` doesn't work because now `ch` is not mutable.
+ */
+#define string_for_each(name, string)                                          \
+for (const char *_ptr_ = (string).data, *const _end_ = _ptr_ + (string).len;   \
+    _ptr_ < _end_;                                                             \
+    ++_ptr_)                                                                   \
+    for (char name = *_ptr_, _first_ = 1; _first_; _first_ = 0)
 
 #define string_for_eachi(idx, string) \
 for (size_t idx = 0, _end_ = (string).len; idx < _end_; ++idx)
 
 // C99 compound literals have VERY different semantics in C++.
 #ifdef __cplusplus
-#define string_literal(literall)    {literal, sizeof(literal) - 1}
+#define string_literal(literal)     {literal, sizeof(literal) - 1}
 #else // !__cplusplus
 #define string_literal(literal)     (String){literal, sizeof(literal) - 1}
 #endif // __cplusplus
@@ -60,6 +74,12 @@ string_trim_right_fn(String text, bool (*callback)(char ch));
 
 // LEFT INDEX FUNCTIONS ---------------------------------------------------- {{{
 
+/**
+ * @param comparison
+ *      Can be `false` or `0` so that you get the first index of the first
+ *      character that does NOT satisfy `callback`. You can also think of this
+ *      as 'negating' character classes.
+ */
 size_t
 string_index_fn(String text, bool (*callback)(char ch), bool comparison);
 
@@ -99,22 +119,22 @@ string_last_index_any_cstring(String haystack, const char *charset);
 // SPLIT ITERATORS --------------------------------------------------------- {{{
 
 bool
-string_split_iterator_fn(String *state, String *current, bool (*callback)(char ch));
+string_split_iterator_fn(String *current, String *state, bool (*callback)(char ch));
 
 bool
-string_split_char_iterator(String *state, String *current, char sep);
+string_split_char_iterator(String *current, String *state, char sep);
 
 bool
-string_split_string_iterator(String *state, String *current, String sep);
+string_split_string_iterator(String *current, String *state, String sep);
 
 bool
-string_split_cstring_iterator(String *state, String *current, const char *sep);
+string_split_cstring_iterator(String *current, String *state, const char *sep);
 
 bool
-string_split_lines_iterator(String *state, String *current);
+string_split_lines_iterator(String *current, String *state);
 
 bool
-string_split_whitespace_iterator(String *state, String *current);
+string_split_whitespace_iterator(String *current, String *state);
 
 // }}} -------------------------------------------------------------------------
 
@@ -171,10 +191,10 @@ bool
 string_builder_append_cstring(String_Builder *builder, const char *text);
 
 String
-string_builder_to_string(String_Builder *builder);
+string_builder_to_string(const String_Builder *builder);
 
 const char *
-string_builder_to_cstring(String_Builder *builder);
+string_builder_to_cstring(const String_Builder *builder);
 
 // }}} -------------------------------------------------------------------------
 

@@ -105,6 +105,16 @@ resolve_type(Type_Info *info)
 }
 
 static bool
+promote_type(Type_Info *info, Type_Base expected, Type_Base promotion)
+{
+    if (info->base == expected) {
+        info->base = promotion;
+        return true;
+    }
+    return false;
+}
+
+static bool
 parse_type(Type_Table *table, String type, Type_Info *out_info)
 {
     // This type already exists and is valid?
@@ -113,7 +123,12 @@ parse_type(Type_Table *table, String type, Type_Info *out_info)
     
     // Parse the string `type` and generate a query from it.
     Type_Info info = {.base = TYPE_BASE_NONE, .modifier = TYPE_MOD_NONE};
-    for (String state = type, word; string_split_whitespace_iterator(&state, &word);) {
+    for (String state = type, word; string_split_whitespace_iterator(&word, &state);) {
+        // Split iterators only split at the first match
+        if (word.len == 0)
+            continue;
+
+        printfln("\t- " STRING_QFMTSPEC, expand(word));
         switch (word.data[0]) {
         case 'c': {
             if (!set_type_id(&info, TYPE_BASE_CHAR, word))
@@ -134,30 +149,32 @@ parse_type(Type_Table *table, String type, Type_Info *out_info)
         }
         case 'i':
             if (!set_type_id(&info, TYPE_BASE_INT, word)) {
-                // `long int` and `long long int` are valid.
-                if (info.base == TYPE_BASE_LONG || info.base == TYPE_BASE_LONG_LONG)
+                // 'short int', `long int` and `long long int` are valid.
+                if (info.base == TYPE_BASE_SHORT || info.base == TYPE_BASE_LONG
+                    || info.base == TYPE_BASE_LONG_LONG)
                     continue;
                 return false;
             }
             break;
         case 'l':
             if (!set_type_id(&info, TYPE_BASE_LONG, word)) {
-                // Do not error out on `int long`.
-                if (info.base == TYPE_BASE_INT) {
-                    info.base = TYPE_BASE_LONG;
+                // `int long`
+                if (promote_type(&info, TYPE_BASE_INT, TYPE_BASE_LONG))
                     continue;
-                }
-                // Do not error out on `long long`.
-                else if (info.base == TYPE_BASE_LONG) {
-                    info.base = TYPE_BASE_LONG_LONG;
+                // 'long long' (may also have come from 'int long long')
+                else if (promote_type(&info, TYPE_BASE_LONG, TYPE_BASE_LONG_LONG))
                     continue;
-                }
-                return false;
+                else
+                    return false;
             }
             break;
         case 's':
-            if (!set_type_id(&info, TYPE_BASE_SHORT, word))
+            if (!set_type_id(&info, TYPE_BASE_SHORT, word)) {
+                // 'int short'
+                if (promote_type(&info, TYPE_BASE_INT, TYPE_BASE_SHORT))
+                    continue;
                 return false;
+            }
             if (!set_type_mod(&info, TYPE_MOD_SIGNED, word))
                 return false;
             break;
@@ -172,7 +189,7 @@ parse_type(Type_Table *table, String type, Type_Info *out_info)
         }
     }
 
-    char buf[512];
+    char buf[64];
     String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
     resolve_type(&info);
     string_builder_append_string(&builder, TYPE_MOD_STRINGS[info.modifier]);
@@ -203,6 +220,7 @@ run_interactive(Type_Table *table)
         String    tmp  = {.data = buf, .len = strcspn(buf, "\r\n")};
         String    name = string_trim_space(tmp);
         Type_Info info;
+        printfln(STRING_QFMTSPEC, expand(name));
         if (parse_type(table, name, &info)) {
             printfln(STRING_QFMTSPEC ": {base = %i, modifier = %i}",
                 expand(name),

@@ -48,9 +48,9 @@ static uint32_t
 fnv_hash(String data)
 {
     uint32_t hash = FNV_OFFSET;
-    string_for_each(datum, data) {
+    string_for_each(byte, data) {
         // Can't cast the expression to `uint32_t`? Is this not defined behavior?
-        hash ^= cast(unsigned char)*datum;
+        hash ^= cast(unsigned char)byte;
         hash *= FNV_PRIME;
     }
     return hash;

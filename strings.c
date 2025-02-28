@@ -1,4 +1,5 @@
 #include "strings.h"
+#include "ascii.h"
 
 #include <assert.h> // assert
 #include <string.h> // strlen, memcmp
@@ -47,33 +48,16 @@ string_trim_space(String text)
     return string_trim_right_space(string_trim_left_space(text));
 }
 
-// https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Whitespace.html
-static bool
-is_whitespace(char ch)
-{
-    switch (ch) {
-    case ' ':
-    case '\t': // horizontal tab
-    case '\f': // form-feed
-    case '\v': // vertical-tab
-    case '\r': // carriage-return
-    case '\n': // linefeed
-        return true;
-    default:
-        return false;
-    }
-}
-
 String
 string_trim_left_space(String text)
 {
-    return string_trim_left_fn(text, &is_whitespace);
+    return string_trim_left_fn(text, &ascii_is_whitespace);
 }
 
 String
 string_trim_right_space(String text)
 {
-    return string_trim_right_fn(text, &is_whitespace);
+    return string_trim_right_fn(text, &ascii_is_whitespace);
 }
 
 String
@@ -149,8 +133,8 @@ string_index_char(String haystack, char needle)
 size_t
 string_index_any_string(String haystack, String charset)
 {
-    string_for_each(ptr, charset) {
-        size_t i = string_index_char(haystack, *ptr);
+    string_for_each(expected, charset) {
+        size_t i = string_index_char(haystack, expected);
         if (i != STRING_NOT_FOUND)
             return i;
     }
@@ -192,8 +176,8 @@ string_last_index_char(String haystack, char needle)
 size_t
 string_last_index_any_string(String haystack, String charset)
 {
-    string_for_each(ptr, charset) {
-        size_t i = string_last_index_char(haystack, *ptr);
+    string_for_each(expected, charset) {
+        size_t i = string_last_index_char(haystack, expected);
         if (i != STRING_NOT_FOUND)
             return i;
     }
@@ -211,25 +195,63 @@ string_last_index_any_cstring(String haystack, const char *charset)
 // SPLIT ITERATORS --------------------------------------------------------- {{{
 
 bool
-string_split_lines_iterator(String *state, String *current)
+string_split_lines_iterator(String *current, String *state)
 {
     return string_split_char_iterator(state, current, '\n');
 }
 
 bool
-string_split_whitespace_iterator(String *state, String *current)
+string_split_whitespace_iterator(String *current, String *state)
 {
-    return string_split_iterator_fn(state, current, &is_whitespace);
+    size_t start = STRING_NOT_FOUND;
+    size_t stop  = STRING_NOT_FOUND;
+    String view  = *state;
+    string_for_eachi(index, view) {
+        stop = index;
+        char ch = view.data[index];
+        if (ascii_is_whitespace(ch)) {
+            // I would love a signed size type right about now...
+            if (start != STRING_NOT_FOUND) {
+                *current = string_slice(view, start, stop);
+                *state   = string_slice(view, stop, view.len);
+                return true;
+            }
+        } else {
+            /**
+             * Only save the starting index now so that we can toss out ALL
+             * non-whitespace before the first valid character. This is useful
+             * if the user typed multiple whitespace between words.
+             *
+             * @example
+             *      "hi   mom"
+             *      [1]: "hi"
+             *      [2]: "   mom" => "mom"
+             */
+            if (start == STRING_NOT_FOUND)
+                start = stop;
+        }
+    }
+    
+    // We didn't even iterate? This means `state` is already exhausted.
+    if (stop == STRING_NOT_FOUND || start == STRING_NOT_FOUND) {
+        *current = string_slice(view, view.len, view.len);
+        return false;
+    }
+    
+    // We probably ended the loop early.
+    *current = string_slice(view, start, view.len);
+    *state   = string_slice(view, view.len, view.len);
+    return true;
 }
 
 bool
-string_split_cstring_iterator(String *state, String *current, const char *sep)
+string_split_cstring_iterator(String *current, String *state, const char *sep)
 {
     return string_split_string_iterator(state, current, string_from_cstring(sep));
 }
 
 static bool
-_string_split_iterator(String *state, String *current, size_t index)
+_string_split_iterator(String *current, String *state, size_t index)
 {
     // If `index == STRING_NOT_FOUND`, we match the remainder of the string.
     *current = string_slice(*state, 0, (index == STRING_NOT_FOUND) ? state->len : index);
@@ -250,7 +272,7 @@ _string_split_iterator(String *state, String *current, size_t index)
 }
 
 bool
-string_split_iterator_fn(String *state, String *current, bool (*callback)(char ch))
+string_split_iterator_fn(String *current, String *state, bool (*callback)(char ch))
 {
     if (state->len == 0)
         return false;
@@ -260,7 +282,7 @@ string_split_iterator_fn(String *state, String *current, bool (*callback)(char c
 }
 
 bool
-string_split_char_iterator(String *state, String *current, char sep)
+string_split_char_iterator(String *current, String *state, char sep)
 {
     if (state->len == 0)
         return false;
@@ -270,7 +292,7 @@ string_split_char_iterator(String *state, String *current, char sep)
 }
 
 bool
-string_split_string_iterator(String *state, String *current, String sep)
+string_split_string_iterator(String *current, String *state, String sep)
 {
     if (state->len == 0)
         return false;
