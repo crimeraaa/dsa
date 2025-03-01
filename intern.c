@@ -67,8 +67,9 @@ _intern_get(Intern_Entry entries[], size_t cap, String string, uint32_t hash, in
     // Micro-optimization to avoid constant pointer dereferences.
     int _probe = 0;
     for (size_t i = cast(size_t)hash % cap; /* empty */; ++_probe, i = (i + 1) % cap) {
-        // This string isn't interned yet.
         Intern_String *istring = entries[i].value;
+
+        // This string isn't interned yet.
         if (istring == NULL)
             goto set_result;
 
@@ -167,7 +168,7 @@ _intern_set(Intern *intern, String text, uint32_t hash)
         alignof(Intern_String), // alignof(*value) is an extension MSVC doesn't have
         intern->allocator
     );
-    
+
     if (value == NULL)
         return NULL;
 

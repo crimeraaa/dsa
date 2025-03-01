@@ -5,209 +5,8 @@
 #include "intern.h"
 #include "types.h"
 
-
-#define NEW_SIGNED(type_base)   {.base = (type_base), .modifier = TYPE_MOD_SIGNED}
-#define NEW_UNSIGNED(type_base) {.base = (type_base), .modifier = TYPE_MOD_UNSIGNED}
-#define NEW_TYPE(type_base)     {.base = (type_base), .modifier = TYPE_MOD_NONE}
-#define NEW_COMPLEX(type_base)  {.base = (type_base), .modifier = TYPE_MOD_COMPLEX}
-
-#define expand   string_expand
-#define literal  string_literal
-
-static const struct {
-    const char *name;
-    Type_Info   info;
-} TYPES[] = {
-    // <type>
-    {.name = "char",                .info = NEW_TYPE(TYPE_BASE_CHAR)},
-    {.name = "short",               .info = NEW_SIGNED(TYPE_BASE_SHORT)},
-    {.name = "int",                 .info = NEW_SIGNED(TYPE_BASE_INT)},
-    {.name = "long",                .info = NEW_SIGNED(TYPE_BASE_LONG)},
-    {.name = "long long",           .info = NEW_SIGNED(TYPE_BASE_LONG_LONG)},
-    {.name = "float",               .info = NEW_TYPE(TYPE_BASE_FLOAT)},
-    {.name = "double",              .info = NEW_TYPE(TYPE_BASE_DOUBLE)},
-    {.name = "void",                .info = NEW_TYPE(TYPE_BASE_VOID)},
-    
-    // `char` is not guaranteed to be signed or unsigned.
-    {.name = "signed char",         .info = NEW_SIGNED(TYPE_BASE_CHAR)},
-    
-    // unsigned types do not alias any other builtin types
-    {.name = "unsigned char",       .info = NEW_UNSIGNED(TYPE_BASE_CHAR)},
-    {.name = "unsigned short",      .info = NEW_UNSIGNED(TYPE_BASE_SHORT)},
-    {.name = "unsigned int",        .info = NEW_UNSIGNED(TYPE_BASE_INT)},
-    {.name = "unsigned long",       .info = NEW_UNSIGNED(TYPE_BASE_LONG)},
-    {.name = "unsigned long long",  .info = NEW_UNSIGNED(TYPE_BASE_LONG_LONG)},
-    
-    {.name = "complex float",       .info = NEW_COMPLEX(TYPE_BASE_FLOAT)},
-    {.name = "complex double",      .info = NEW_COMPLEX(TYPE_BASE_DOUBLE)},
-};
-
 static void
-initialize_types(Type_Table *table)
-{
-    for (size_t i = 0; i < count_of(TYPES); ++i) {
-        String    name = {TYPES[i].name, strlen(TYPES[i].name)};
-        Type_Info info = TYPES[i].info;
-        type_table_add(table, name, info);
-    }
-
-    type_table_print(table, stdout);
-}
-
-static bool
-set_type_id(Type_Info *info, Type_Base base, String word)
-{
-    if (string_eq(word, TYPE_BASE_STRINGS[base])) {
-        // Was previously set?
-        if (info->base != TYPE_BASE_NONE)
-            return false;
-
-        info->base = base;
-    }
-    return true;
-}
-
-static bool
-set_type_mod(Type_Info *info, Type_Modifier modifier, String word)
-{
-    if (string_eq(word, TYPE_MOD_STRINGS[modifier])) {
-        // Was previously set?
-        if (info->modifier != TYPE_MOD_NONE)
-            return false;
-
-        info->modifier = modifier;
-    }
-    return true;
-}
-
-static void
-resolve_type(Type_Info *info)
-{
-    if (info->base == TYPE_BASE_NONE && info->modifier != TYPE_MOD_NONE) {
-        switch (info->modifier) {
-        // Resolve `signed` to `int` and `unsigned` to `unsigned int`.
-        case TYPE_MOD_SIGNED:
-            info->modifier = TYPE_MOD_NONE; // fallthrough
-        case TYPE_MOD_UNSIGNED:
-            info->base = TYPE_BASE_INT;
-            break;
-        case TYPE_MOD_COMPLEX:
-            info->base = TYPE_BASE_DOUBLE;
-            break;
-        default:
-            break;
-        }
-    }
-    // Resolve `signed short`, `long long signed` to just their types.
-    else if (info->base != TYPE_BASE_CHAR && info->modifier == TYPE_MOD_SIGNED) {
-        info->modifier = TYPE_MOD_NONE;
-    }
-}
-
-static bool
-promote_type(Type_Info *info, Type_Base expected, Type_Base promotion)
-{
-    if (info->base == expected) {
-        info->base = promotion;
-        return true;
-    }
-    return false;
-}
-
-static bool
-parse_type(Type_Table *table, String type, Type_Info *out_info)
-{
-    // This type already exists and is valid?
-    if (type_table_get(table, type, out_info) == TYPE_TABLE_OK)
-        return true;
-    
-    // Parse the string `type` and generate a query from it.
-    Type_Info info = {.base = TYPE_BASE_NONE, .modifier = TYPE_MOD_NONE};
-    for (String state = type, word; string_split_whitespace_iterator(&word, &state);) {
-        // Split iterators only split at the first match
-        if (word.len == 0)
-            continue;
-
-        printfln("\t- " STRING_QFMTSPEC, expand(word));
-        switch (word.data[0]) {
-        case 'c': {
-            if (!set_type_id(&info, TYPE_BASE_CHAR, word))
-                return false;
-            if (!set_type_mod(&info, TYPE_MOD_COMPLEX, word))
-                return false;
-            break;
-        }
-        case 'd': {
-            if (!set_type_id(&info, TYPE_BASE_DOUBLE, word))
-                return false;
-            break;
-        }
-        case 'f': {
-            if (!set_type_id(&info, TYPE_BASE_FLOAT, word))
-                return false;
-            break;
-        }
-        case 'i':
-            if (!set_type_id(&info, TYPE_BASE_INT, word)) {
-                // 'short int', `long int` and `long long int` are valid.
-                if (info.base == TYPE_BASE_SHORT || info.base == TYPE_BASE_LONG
-                    || info.base == TYPE_BASE_LONG_LONG)
-                    continue;
-                return false;
-            }
-            break;
-        case 'l':
-            if (!set_type_id(&info, TYPE_BASE_LONG, word)) {
-                // `int long`
-                if (promote_type(&info, TYPE_BASE_INT, TYPE_BASE_LONG))
-                    continue;
-                // 'long long' (may also have come from 'int long long')
-                else if (promote_type(&info, TYPE_BASE_LONG, TYPE_BASE_LONG_LONG))
-                    continue;
-                else
-                    return false;
-            }
-            break;
-        case 's':
-            if (!set_type_id(&info, TYPE_BASE_SHORT, word)) {
-                // 'int short'
-                if (promote_type(&info, TYPE_BASE_INT, TYPE_BASE_SHORT))
-                    continue;
-                return false;
-            }
-            if (!set_type_mod(&info, TYPE_MOD_SIGNED, word))
-                return false;
-            break;
-        case 'u':
-            if (!set_type_mod(&info, TYPE_MOD_UNSIGNED, word))
-                return false;
-            break;
-        case 'v':
-            if (!set_type_id(&info, TYPE_BASE_VOID, word))
-                return false;
-            break;
-        }
-    }
-
-    char buf[64];
-    String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
-    resolve_type(&info);
-    string_builder_append_string(&builder, TYPE_MOD_STRINGS[info.modifier]);
-
-    // If we had `TYPE_BASE_NONE` with `TYPE_MOD_SIGNED` (e.g. "signed"), we
-    // should have resolved to `TYPE_BASE_INT` with `TYPE_MOD_NONE`.
-    if (info.modifier != TYPE_MOD_NONE)
-        string_builder_append_char(&builder, ' ');
-    string_builder_append_string(&builder, TYPE_BASE_STRINGS[info.base]);
-
-    // Testing if we already nul-terminated it
-    String query = string_builder_to_string(&builder);
-    printfln("Query: \'%s\'", query.data);
-    return type_table_get(table, query, out_info) == TYPE_TABLE_OK;
-}
-
-static void
-run_interactive(Type_Table *table)
+run_interactive(void)
 {
     char buf[512];
     for (;;) {
@@ -217,33 +16,18 @@ run_interactive(Type_Table *table)
             break;
         }
 
-        String    tmp  = {.data = buf, .len = strcspn(buf, "\r\n")};
-        String    name = string_trim_space(tmp);
-        Type_Info info;
-        printfln(STRING_QFMTSPEC, expand(name));
-        if (parse_type(table, name, &info)) {
-            printfln(STRING_QFMTSPEC ": {base = %i, modifier = %i}",
-                expand(name),
-                info.base,
-                info.modifier
-            );
-        } else {
-            printfln("Invalid type " STRING_QFMTSPEC ".", expand(name));
+        String name = {.data = buf, .len = strcspn(buf, "\r\n")};
+        printfln(STRING_QFMTSPEC, STRING_FMTARG(name));
+        if (!type_parse_string(name)) {
+            printfln("Invalid type " STRING_QFMTSPEC ".",
+                STRING_FMTARG(name));
         }
     }
 }
 
-
 int
-main(int argc, char *argv[])
+main(void)
 {
-    unused(argc);
-    unused(argv);
-
-    Type_Table table = type_table_make(PANIC_ALLOCATOR);
-    initialize_types(&table);
-    run_interactive(&table);
-    type_table_destroy(&table);
-    
+    run_interactive();
     return 0;
 }

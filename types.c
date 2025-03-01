@@ -1,169 +1,505 @@
 #include "types.h"
 
-#include <string.h> // memset
-#include <stdint.h> // uint32_t
+#include <stdint.h>
+#include <setjmp.h>
 
-#define lit string_literal
+/**
+ * @brief
+ *      'basic' types are the first step in determining what a type even *is*.
+ *
+ * @note
+ *      We do not consider modifiers such as `signed`, `unsigned`, `complex`,
+ *      `const`, etc. We only want to check how we should begin interpreting this
+ *      type.
+ */
+typedef enum {
+    TYPE_BASIC_NONE,        // The default. May also signal invalid types.
+    TYPE_BASIC_CHAR,        // @note Not guaranteed to be `signed` nor `unsigned`.
+    TYPE_BASIC_SHORT,       // aliases: `short int` and `int short` and `signed` variationos thereof.
+    TYPE_BASIC_INT,         // aliases: `signed int` and `int signed`.
+    TYPE_BASIC_LONG,        // aliases: `long int`, `int long` and `signed` variations thereof.
+    TYPE_BASIC_LONG_LONG,   // aliases: `long long int`, `int long long`, `long int long` and `signed` variations thereof.
 
-const String
-TYPE_BASE_STRINGS[TYPE_BASE_COUNT] = {
-    [TYPE_BASE_NONE]        = {NULL, 0},
-    [TYPE_BASE_VOID]        = lit("void"),
+    TYPE_BASIC_FLOAT,
+    TYPE_BASIC_DOUBLE,
+    TYPE_BASIC_LONG_DOUBLE, // ugh
 
-    [TYPE_BASE_CHAR]        = lit("char"),
-    [TYPE_BASE_SHORT]       = lit("short"),
-    [TYPE_BASE_INT]         = lit("int"),
-    [TYPE_BASE_LONG]        = lit("long"),
-    [TYPE_BASE_LONG_LONG]   = lit("long long"),
+    TYPE_BASIC_VOID,
+    TYPE_BASIC_POINTER,
 
-    [TYPE_BASE_FLOAT]       = lit("float"),
-    [TYPE_BASE_DOUBLE]      = lit("double"),
+    TYPE_BASIC_STRUCT,
+    TYPE_BASIC_ENUM,
+    TYPE_BASIC_UNION,
 
-    [TYPE_BASE_STRUCT]      = lit("struct"),
-    [TYPE_BASE_ENUM]        = lit("enum"),
-    [TYPE_BASE_UNION]       = lit("union"),
+    TYPE_BASIC_COUNT,
+} Type_Basic;
 
-    [TYPE_BASE_POINTER]     = {NULL, 0},
-},
+typedef enum {
+    TYPE_MOD_NONE,
+    TYPE_MOD_SIGNED,
+    TYPE_MOD_UNSIGNED,
+    TYPE_MOD_COMPLEX,
+    TYPE_MOD_COUNT,
+} Type_Modifier;
 
-TYPE_MOD_STRINGS[TYPE_MOD_COUNT] = {
-    [TYPE_MOD_NONE]         = {NULL, 0},
-    [TYPE_MOD_SIGNED]       = lit("signed"),
-    [TYPE_MOD_UNSIGNED]     = lit("unsigned"),
-    [TYPE_MOD_COMPLEX]      = lit("complex"),
+#define BIT(N)  (1 << (N))
+
+/**
+ * @note
+ *      Qualifiers can be nested, e.g. `const volatile int`.
+ *      So each enumeration member (sans `TYPE_QUAL_COUNT`) actually represents
+ *      a bit flag. Use the `BIT` macro to get them.
+ */
+typedef enum {
+    TYPE_QUAL_CONST,
+    TYPE_QUAL_VOLATILE,
+    TYPE_QUAL_RESTRICT,
+    TYPE_QUAL_COUNT,
+} Type_Qualifier;
+
+#define lit     string_literal
+
+static const String
+TYPE_BASIC_STRINGS[TYPE_BASIC_COUNT] = {
+    [TYPE_BASIC_NONE]       = {NULL, 0},
+    [TYPE_BASIC_CHAR]       = lit("char"),
+    [TYPE_BASIC_SHORT]      = lit("short"),
+    [TYPE_BASIC_INT]        = lit("int"),
+    [TYPE_BASIC_LONG]       = lit("long"),
+    [TYPE_BASIC_LONG_LONG]  = lit("long long"),
+
+    [TYPE_BASIC_FLOAT]      = lit("float"),
+    [TYPE_BASIC_DOUBLE]     = lit("double"),
+    [TYPE_BASIC_LONG_DOUBLE]= lit("long double"),
+
+    [TYPE_BASIC_VOID]       = lit("void"),
+    [TYPE_BASIC_POINTER]    = lit(" *"),
+
+    [TYPE_BASIC_STRUCT]     = lit("struct"),
+    [TYPE_BASIC_ENUM]       = lit("enum"),
+    [TYPE_BASIC_UNION]      = lit("union"),
 };
 
-Type_Table
-type_table_make(Allocator allocator)
+static const String
+TYPE_MOD_STRINGS[TYPE_MOD_COUNT] = {
+    [TYPE_MOD_NONE]     = {NULL, 0},
+    [TYPE_MOD_SIGNED]   = lit("signed"),
+    [TYPE_MOD_UNSIGNED] = lit("unsigned"),
+    [TYPE_MOD_COMPLEX]  = lit("complex"),
+};
+
+static const String
+TYPE_QUAL_STRINGS[TYPE_QUAL_COUNT] = {
+    [TYPE_QUAL_CONST]    = lit("const"),
+    [TYPE_QUAL_VOLATILE] = lit("volatile"),
+    [TYPE_QUAL_RESTRICT] = lit("restrict"),
+};
+
+typedef enum {
+    TYPE_PARSE_NONE,
+    TYPE_PARSE_UNKNOWN, // The word we parsed is not a basic type nor a modifier.
+    TYPE_PARSE_INVALID, // The resulting type doesn't make sense, e.g. `long float`, `short char`.
+    TYPE_PARSE_COUNT,
+} Type_Parse_Error;
+
+typedef struct {
+    jmp_buf          caller;
+    Type_Parse_Error error;
+} Error_Handler;
+
+// `Type_Info` is misleading in my opinion because this is very restrictive.
+typedef struct Type_Parse Type_Parse;
+struct Type_Parse {
+    Type_Parse      *pointee; // Stack-allocated linked list via recursion.
+    Error_Handler   *handler;
+    Type_Basic       basic;
+    Type_Modifier    modifier;
+    uint8_t          qualifier;
+};
+
+static bool
+is_integer(const Type_Parse *info)
 {
-    Type_Table table = {
-        .intern    = intern_make(allocator),
-        .entries   = NULL,
-        .count     = 0,
-        .cap       = 0,
-    };
-    return table;
+    return TYPE_BASIC_CHAR <= info->basic && info->basic <= TYPE_BASIC_LONG_LONG;
 }
 
-void
-type_table_destroy(Type_Table *table)
+static bool
+is_floating(const Type_Parse *info)
 {
-    Intern   *intern    = &table->intern;
-    Allocator allocator = intern->allocator;
-
-    mem_delete(table->entries, table->cap, allocator);
-    intern_destroy(intern);
-    table->entries = NULL;
-    table->count   = 0;
-    table->cap     = 0;
+    return TYPE_BASIC_FLOAT <= info->basic && info->basic <= TYPE_BASIC_LONG_DOUBLE;
 }
 
-// Finds the first free entry or the entry itself.
-static Type_Table_Entry *
-_find_entry(Type_Table_Entry *entries, size_t cap, const Intern_String *key)
+static bool
+is_pointer(const Type_Parse *info)
 {
-    // Division (and, by extension, modulo) by 0 is undefined behavior.
-    if (cap == 0)
-        return NULL;
+    return info->basic == TYPE_BASIC_POINTER;
+}
 
-    for (size_t i = cast(size_t)key->hash % cap; /* empty */; i = (i + 1) % cap) {
-        // This entry is free!
-        if (entries[i].name == NULL)
-            return &entries[i];
+static bool
+has_qualifier(const Type_Parse *info, Type_Qualifier qualifier)
+{
+    return info->qualifier & BIT(qualifier);
+}
 
-        // We found the entry we were looking for.
-        if (key == entries[i].name)
-            return &entries[i];
+static void
+set_error(Type_Parse *info, Type_Parse_Error error)
+{
+    info->handler->error = error;
+    if (error == TYPE_PARSE_INVALID)
+        longjmp(info->handler->caller, 1);
+
+}
+
+static void
+set_basic(Type_Parse *info, String word, Type_Basic expected)
+{
+    // No error occured because `word` isn't a basic type. Nothing changes.
+    // `word` could be an identifier such as an alias or a struct/enum/union.
+    if (!string_eq(word, TYPE_BASIC_STRINGS[expected])) {
+        set_error(info, TYPE_PARSE_UNKNOWN);
+        return;
     }
-    __builtin_unreachable();
+
+    // Was previously set?
+    if (info->basic != TYPE_BASIC_NONE) switch (info->basic) {
+    case TYPE_BASIC_SHORT:
+        // Allow `short int`. Do not update `basic->info` because we are
+        // already of the correct type.
+        if (expected == TYPE_BASIC_INT)
+            goto success;
+        goto invalid_combination;
+
+    case TYPE_BASIC_INT:
+        /**
+         * @brief
+         *      Allow `int short` and `int long`.
+         *
+         * @note
+         *      In `int long long`, we would have first parsed `int long` so
+         *      `basic->type` is `TYPE_BASIC_LONG`, thus we would never reach
+         *       here.
+         */
+        if (expected == TYPE_BASIC_SHORT || expected == TYPE_BASIC_LONG) {
+            info->basic = expected;
+            goto success;
+        }
+        goto invalid_combination;
+
+    case TYPE_BASIC_LONG:
+        // Allow `long int`. Same idea as `short int`.
+        if (expected == TYPE_BASIC_INT) {
+            goto success;
+        }
+        // Allow `long long`.
+        else if (expected == TYPE_BASIC_LONG) {
+            info->basic = TYPE_BASIC_LONG_LONG;
+            goto success;
+        }
+        // Allow `long double`.
+        else if (expected == TYPE_BASIC_DOUBLE) {
+            info->basic = TYPE_BASIC_LONG_DOUBLE;
+            goto success;
+        }
+        goto invalid_combination;
+
+    // Allow `long long int`.
+    case TYPE_BASIC_LONG_LONG:
+        if (expected == TYPE_BASIC_INT)
+            goto success;
+        goto invalid_combination;
+
+    case TYPE_BASIC_DOUBLE:
+        if (expected == TYPE_BASIC_LONG) {
+            info->basic = TYPE_BASIC_LONG_DOUBLE;
+            goto success;
+        }
+        goto invalid_combination;
+
+    default: invalid_combination:
+        printfln("ERROR: Invalid type combination " STRING_QFMTSPEC " and \'%s\'",
+            STRING_FMTARG(word),
+            TYPE_BASIC_STRINGS[expected].data);
+        set_error(info, TYPE_PARSE_INVALID);
+        return;
+    }
+    info->basic = expected;
+success:
+    printfln("Type '%s'", TYPE_BASIC_STRINGS[info->basic].data);
 }
 
-bool
-_reserve(Type_Table *table, size_t new_cap)
+static void
+set_modifier(Type_Parse *info, String word, Type_Modifier expected)
 {
-    Allocator allocator = table->intern.allocator;
-
-    Type_Table_Entry *old_entries = table->entries;
-    size_t old_cap = table->cap;
-
-    Type_Table_Entry *new_entries = mem_make(Type_Table_Entry, new_cap, allocator);
-    if (new_entries == NULL)
-        return false;
-
-    memset(new_entries, 0, sizeof(new_entries[0]) * new_cap);
-
-    size_t new_count = 0;
-    for (size_t i = 0; i < old_cap; ++i) {
-        if (old_entries[i].name == NULL)
-            continue;
-
-        *_find_entry(new_entries, new_cap, old_entries[i].name) = old_entries[i];
-        ++new_count;
+    if (!string_eq(word, TYPE_MOD_STRINGS[expected])) {
+        set_error(info, TYPE_PARSE_UNKNOWN);
+        return;
     }
 
+    // You cannot repeat or combine modifiers, e.g. `signed signed int` or `signed complex float`.
+    if (info->modifier != TYPE_MOD_NONE) {
+        printfln("ERROR: Already have modifier " STRING_QFMTSPEC " but got '%s'",
+            STRING_FMTARG(word),
+            TYPE_MOD_STRINGS[expected].data);
+        set_error(info, TYPE_PARSE_INVALID);
+    }
 
-    mem_delete(old_entries, old_cap, allocator);
-    table->entries = new_entries;
-    table->count   = new_count;
-    table->cap     = new_cap;
+    if (info->basic != TYPE_BASIC_NONE) {
+        switch (expected) {
+        case TYPE_MOD_SIGNED: // fallthrough
+        case TYPE_MOD_UNSIGNED:
+            if (!is_integer(info))
+                goto invalid_combination;
+            break;
+        case TYPE_MOD_COMPLEX:
+            if (!is_floating(info)) invalid_combination: {
+                printfln("ERROR: Invalid type and modifier '%s' and '%s'",
+                    TYPE_BASIC_STRINGS[info->basic].data,
+                    TYPE_MOD_STRINGS[expected].data);
+                set_error(info, TYPE_PARSE_INVALID);
+                return;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    info->modifier = expected;
+    printfln("Modifier: '%s'", TYPE_MOD_STRINGS[expected].data);
+    set_error(info, TYPE_PARSE_NONE);
+}
+
+static void
+set_qualifier(Type_Parse *info, String word, Type_Qualifier expected)
+{
+    if (!string_eq(word, TYPE_QUAL_STRINGS[expected])) {
+        set_error(info, TYPE_PARSE_UNKNOWN);
+        return;
+    }
+
+    // This qualifier was previously set?
+    // `const const int` is valid in C99 and above, but I dislike it.
+    // https://stackoverflow.com/questions/5781222/duplicate-const-qualifier-allowed-in-c-but-not-in-c
+    if (has_qualifier(info, expected)) {
+        printfln("ERROR: Duplicate qualifier '%s'", TYPE_QUAL_STRINGS[expected].data);
+        set_error(info, TYPE_PARSE_INVALID);
+        return;
+    }
+    printfln("Qualifier: '%s'", TYPE_QUAL_STRINGS[expected].data);
+    info->qualifier |= BIT(expected);
+    set_error(info, TYPE_PARSE_NONE);
+}
+
+// Ensure modifiers and qualifiers are valid for their basic types.
+static bool
+check_type(Type_Parse *info)
+{
+    switch (info->modifier) {
+    case TYPE_MOD_SIGNED:
+    case TYPE_MOD_UNSIGNED:
+        if (!is_integer(info))
+            goto invalid_combination;
+        break;
+    case TYPE_MOD_COMPLEX:
+        if (!is_floating(info)) invalid_combination: {
+            printfln("ERROR: '%s' cannot be used with '%s'",
+                TYPE_MOD_STRINGS[info->modifier].data,
+                TYPE_BASIC_STRINGS[info->basic].data);
+            set_error(info, TYPE_PARSE_INVALID);
+            return false;
+        }
+        break;
+    default:
+        break;
+    }
+
+    if (has_qualifier(info, TYPE_QUAL_RESTRICT)) {
+        if (!is_pointer(info)) {
+            printfln("ERROR: '%s' cannot be used with '%s'",
+                TYPE_QUAL_STRINGS[TYPE_QUAL_RESTRICT].data,
+                TYPE_BASIC_STRINGS[info->basic].data);
+            set_error(info, TYPE_PARSE_INVALID);
+            return false;
+        }
+    }
+    set_error(info, TYPE_PARSE_NONE);
     return true;
 }
 
-Type_Table_Error
-type_table_add(Type_Table *table, String name, Type_Info info)
+static void
+finalize_type(Type_Parse *info)
 {
-    if (table->count >= (table->cap * 3) / 4) {
-        size_t new_cap = (table->cap == 0) ? 8 : table->cap * 2;
-        if (!_reserve(table, new_cap))
-            return TYPE_TABLE_NOMEM;
-    }
+    // Map default types for lone modifiers.
+    if (info->basic == TYPE_BASIC_NONE) {
+        switch (info->modifier) {
+        // `signed` maps to `signed int` which in turn maps to `int`.
+        case TYPE_MOD_SIGNED:
+        // `unsigned` maps to `unsigned int`.
+        case TYPE_MOD_UNSIGNED:
+            info->basic = TYPE_BASIC_INT;
+            break;
 
-    const Intern_String *key   = intern_get_interned(&table->intern, name);
-    Type_Table_Entry    *entry = _find_entry(table->entries, table->cap, key);
-    ++table->count;
-    entry->name = key;
-    entry->info = info;
-    return TYPE_TABLE_OK;
-}
+        // `complex` maps to `complex double`.
+        case TYPE_MOD_COMPLEX:
+            info->basic = TYPE_BASIC_DOUBLE;
+            break;
 
-Type_Table_Error
-type_table_new_alias(Type_Table *table, String name, String alias, Type_Info *out_info)
-{
-    Type_Table_Error err = type_table_get(table, name, out_info);
-    // `name` actually exists in the table?
-    if (err == TYPE_TABLE_OK)
-        err = type_table_add(table, alias, *out_info);
-    return err;
-}
-
-Type_Table_Error
-type_table_get(Type_Table *table, String name, Type_Info *out_info)
-{
-    const Intern_String *key   = intern_get_interned(&table->intern, name);
-    Type_Table_Entry    *entry = _find_entry(table->entries, table->cap, key);
-    if (entry != NULL && entry->name != NULL) {
-        *out_info = entry->info;
-        return TYPE_TABLE_OK;
-    }
-    return TYPE_TABLE_NOKEY;
-}
-
-void
-type_table_print(const Type_Table *table, FILE *stream)
-{
-    size_t cap = table->cap;
-    fprintln(stream, "[TYPE INFO]");
-    const Type_Table_Entry *entries = table->entries;
-    for (size_t i = 0; i < cap; ++i) {
-        fprintf(stream, "\t[%zu]: ", i);
-        if (entries[i].name == NULL) {
-            fputc('\n', stream);
-            continue;
+        default:
+            println("ERROR: No basic type nor modifier were received.");
+            set_error(info, TYPE_PARSE_INVALID);
+            return;
         }
-        fprintfln(stream, "\"%s\": {base = %i, modifier = %i}",
-            entries[i].name->data,
-            entries[i].info.base,
-            entries[i].info.modifier
-        );
+    }
+
+    // Ensure all the integer types (sans `char`) are signed when not specified.
+    switch (info->basic) {
+    case TYPE_BASIC_SHORT:
+    case TYPE_BASIC_INT:
+    case TYPE_BASIC_LONG:
+    case TYPE_BASIC_LONG_LONG:
+        if (info->modifier == TYPE_MOD_NONE)
+            info->modifier = TYPE_MOD_SIGNED;
+        break;
+
+    default:
+        break;
+    }
+    check_type(info);
+}
+
+static void
+print_qualifier(const Type_Parse *info, Type_Qualifier qualifier)
+{
+    // Don't use `info.qualifier` as an index as it contains bit flags!
+    if (has_qualifier(info, qualifier))
+        printf(" %s", TYPE_QUAL_STRINGS[qualifier].data);
+}
+
+static void
+print_type(const Type_Parse *info)
+{
+    // Print from the innermost (i.e; most pointed-to) going outermost.
+    if (info->pointee)
+        print_type(info->pointee);
+
+    // Innermost type (the very first pointee) is where we start printing.
+    switch (info->modifier) {
+    case TYPE_MOD_NONE: print_basic:
+        printf("%s", TYPE_BASIC_STRINGS[info->basic].data);
+        break;
+    case TYPE_MOD_SIGNED:
+        // all signed types (except for `char`) map to their base types.
+        // e.g. `signed int` maps to `int`.
+        if (info->basic != TYPE_BASIC_CHAR)
+            goto print_basic;
+        // Fallthrough
+    case TYPE_MOD_UNSIGNED:
+    case TYPE_MOD_COMPLEX:
+        printf("%s %s", TYPE_MOD_STRINGS[info->modifier].data, TYPE_BASIC_STRINGS[info->basic].data);
+        break;
+    default:
+        break;
+    }
+
+    print_qualifier(info, TYPE_QUAL_CONST);
+    print_qualifier(info, TYPE_QUAL_VOLATILE);
+    print_qualifier(info, TYPE_QUAL_RESTRICT);
+}
+
+static void
+parse_with_state(Type_Parse *info, String *state, int recurse)
+{
+    // Help visualize each step of the parsing process.
+    int step = 1;
+    for (String word; string_split_whitespace_iterator(&word, state);) {
+        for (int tabs = 0; tabs < recurse; ++tabs) {
+            fputc('\t', stdout);
+        }
+        printf("[%i]: " STRING_QFMTSPEC " => ", step++, STRING_FMTARG(word));
+        switch (word.data[0]) {
+        case 'c':
+            set_basic(info, word, TYPE_BASIC_CHAR);
+            set_modifier(info, word, TYPE_MOD_COMPLEX);
+            set_qualifier(info, word, TYPE_QUAL_CONST);
+            break;
+        case 'd':
+            set_basic(info, word, TYPE_BASIC_DOUBLE);
+            break;
+        case 'f':
+            set_basic(info, word, TYPE_BASIC_FLOAT);
+            break;
+        case 'i':
+            set_basic(info, word, TYPE_BASIC_INT);
+            break;
+        case 'l':
+            set_basic(info, word, TYPE_BASIC_LONG);
+            break;
+        case 'r':
+            set_qualifier(info, word, TYPE_QUAL_RESTRICT);
+            break;
+        case 's':
+            set_basic(info, word, TYPE_BASIC_SHORT);
+            set_modifier(info, word, TYPE_MOD_SIGNED);
+            break;
+        case 'u':
+            set_modifier(info, word, TYPE_MOD_UNSIGNED);
+            break;
+        case 'v':
+            set_basic(info, word, TYPE_BASIC_VOID);
+            set_qualifier(info, word, TYPE_QUAL_VOLATILE);
+            break;
+        case '*': {
+            // e.g. in `int *const`, `state` currently points to EOF, make it
+            // point to `const`, skipping the `*`.
+            state->data  = word.data + 1;
+            state->len  += word.len - 1;
+            Type_Parse pointer = {
+                .pointee   = info,
+                .handler   = info->handler,
+                .basic     = TYPE_BASIC_POINTER,
+                .modifier  = TYPE_MOD_NONE,
+                .qualifier = 0,
+            };
+            finalize_type(info);
+            printf("Pointer to '");
+            print_type(info);
+            printf("'\n");
+            // Return because we only want to print the deepest recursive call.
+            parse_with_state(&pointer, state, recurse + 1);
+            return;
+        }
+        default:
+            set_error(info, TYPE_PARSE_UNKNOWN);
+            break;
+        }
+
+        if (info->handler->error == TYPE_PARSE_UNKNOWN)
+            println("Identifier(?)");
+    }
+    finalize_type(info);
+    print_type(info);
+    printf("\n");
+}
+
+bool
+type_parse_string(String text)
+{
+    Error_Handler handler;
+    handler.error = TYPE_PARSE_NONE;
+
+    Type_Parse info  = {
+        .pointee   = NULL,
+        .handler   = &handler,
+        .basic     = TYPE_BASIC_NONE,
+        .modifier  = TYPE_MOD_NONE,
+        .qualifier = 0,
+    };
+
+    if (setjmp(handler.caller) == 0) {
+        String state = text;
+        parse_with_state(&info, &state, 1);
+        return true;
+    } else {
+        return false;
     }
 }

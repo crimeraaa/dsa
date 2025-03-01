@@ -13,13 +13,13 @@ typedef struct {
  * @details
  *      The `_first_` nonsense is to allow us to create a for loop that runs
  *      exactly only once.
- * 
+ *
  *      This is useful because we can't declare variables of multiple unique
  *      types within a single statement in C (e.g. `int x = 0, float f = 1.1`).
- * 
+ *
  *      `char ch, *ptr = str.data, *end = ptr + str.len` is not fine because it
  *      casts away constness!
- * 
+ *
  *      `const char ch, *ptr, *end` doesn't work because now `ch` is not mutable.
  */
 #define string_for_each(name, string)                                          \
@@ -38,11 +38,9 @@ for (size_t idx = 0, _end_ = (string).len; idx < _end_; ++idx)
 #define string_literal(literal)     (String){literal, sizeof(literal) - 1}
 #endif // __cplusplus
 
-#define STRING_FMTSPEC      "%.*s"
-#define STRING_QFMTSPEC     "\"" STRING_FMTSPEC "\""
-
-// For use with the `printf` format `"%.*s"`.
-#define string_expand(string)   (int)((string).len), ((string).data)
+#define STRING_FMTSPEC          "%.*s"
+#define STRING_QFMTSPEC         "\'" STRING_FMTSPEC "\'"
+#define STRING_FMTARG(string)   ((int)((string).len)), ((string).data)
 
 // Assumes you'll never have a string this big!
 #define STRING_NOT_FOUND    ((size_t)-1)
@@ -142,24 +140,21 @@ string_split_whitespace_iterator(String *current, String *state);
 
 #define string_index(haystack, needle)                                         \
 _Generic((needle),                                                             \
-    String:       string_index_substring,                                      \
-    char *:       string_index_subcstring,                                     \
-    const char *: string_index_subcstring,                                     \
+    String:     string_index_substring,                                        \
+    default:    string_index_subcstring                                        \
 )(haystack, needle)
 
-#define string_split_iterator(state, current, sep)                             \
+#define string_split_iterator(current, state, sep)                             \
 _Generic((sep),                                                                \
-    String:       string_split_string_iterator,                                \
-    char *:       string_split_cstring_iterator,                               \
-    const char *: string_split_cstring_iterator,                               \
-)(state, current, sep)
+    String:     string_split_string_iterator,                                  \
+    default:    string_split_cstring_iterator                                  \
+)(current, state, sep)
 
-#define string_index_any(haystack, needle)                                     \
-_Generic((needle),                                                             \
-    String:       string_index_any_string,                                     \
-    char *:       string_index_any_cstring,                                    \
-    const char *: string_index_any_cstring                                     \
-)(haystack, needle)
+#define string_index_any(haystack, charset)                                    \
+_Generic((charset),                                                            \
+    String:     string_index_any_string,                                       \
+    default:    string_index_any_cstring,                                      \
+)(haystack, charset)
 
 #endif // __STDC__VERSION__ == 201112L
 

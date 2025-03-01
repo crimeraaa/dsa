@@ -231,13 +231,13 @@ string_split_whitespace_iterator(String *current, String *state)
                 start = stop;
         }
     }
-    
+
     // We didn't even iterate? This means `state` is already exhausted.
     if (stop == STRING_NOT_FOUND || start == STRING_NOT_FOUND) {
         *current = string_slice(view, view.len, view.len);
         return false;
     }
-    
+
     // We probably ended the loop early.
     *current = string_slice(view, start, view.len);
     *state   = string_slice(view, view.len, view.len);
@@ -276,7 +276,7 @@ string_split_iterator_fn(String *current, String *state, bool (*callback)(char c
 {
     if (state->len == 0)
         return false;
-        
+
     size_t index = string_index_fn(*state, callback, true);
     return _string_split_iterator(state, current, index);
 }
