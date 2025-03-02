@@ -57,10 +57,10 @@ end
 --- Create a new set containing the members of `self` that are also in `other`.
 function Set:intersection(other)
     local intersect = new_set()
-    
+
     -- We require `other` to be a `Set` because we need to use its hash table.
     if not is_set(other) then other = new_set(other) end
-    
+
     if is_set(self) then
         for key in pairs(self.data) do
             if other.data[key] then intersect:insert(key) end
@@ -77,9 +77,9 @@ end
 -- Create a new set containing the members of `self` that are NOT in `other`.
 function Set:difference(other)
     local difference = new_set()
-    
+
     if not is_set(other) then other = new_set(other) end
-    
+
     if is_set(self) then
         for key in pairs(self.data) do
             if not other.data[key] then difference:insert(key) end
