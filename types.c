@@ -291,7 +291,7 @@ set_qualifier(Type_Parse *info, String word, Type_Qualifier expected)
 }
 
 // Ensure modifiers and qualifiers are valid for their basic types.
-static bool
+static void
 check_type(Type_Parse *info)
 {
     switch (info->modifier) {
@@ -306,7 +306,7 @@ check_type(Type_Parse *info)
                 TYPE_MOD_STRINGS[info->modifier].data,
                 TYPE_BASIC_STRINGS[info->basic].data);
             set_error(info, TYPE_PARSE_INVALID);
-            return false;
+            return;
         }
         break;
     default:
@@ -319,11 +319,11 @@ check_type(Type_Parse *info)
                 TYPE_QUAL_STRINGS[TYPE_QUAL_RESTRICT].data,
                 TYPE_BASIC_STRINGS[info->basic].data);
             set_error(info, TYPE_PARSE_INVALID);
-            return false;
+            return;
         }
     }
     set_error(info, TYPE_PARSE_NONE);
-    return true;
+    return;
 }
 
 static void

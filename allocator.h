@@ -7,12 +7,19 @@
 #include "common.h"
 
 typedef enum {
-    ALLOCATOR_MALLOC,
-    ALLOCATOR_MRESIZE,
-    ALLOCATOR_MFREE,
+    ALLOCATOR_MODE_ALLOC,
+    ALLOCATOR_MODE_RESIZE,
+    ALLOCATOR_MODE_FREE,
 } Allocator_Mode;
 
-typedef void *(*Allocator_Fn)(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t old_size, size_t new_size, size_t align);
+typedef struct {
+    void  *old_ptr;
+    size_t old_size;
+    size_t new_size;
+    size_t alignment;
+} Allocator_Args;
+
+typedef void *(*Allocator_Fn)(void *user_ptr, Allocator_Mode mode, Allocator_Args args);
 
 typedef struct {
     Allocator_Fn fn;

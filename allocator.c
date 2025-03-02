@@ -10,22 +10,20 @@
 #undef mem_delete
 
 static void *
-heap_allocator_fn(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t old_size, size_t new_size, size_t align)
+heap_allocator_fn(void *user_ptr, Allocator_Mode mode, Allocator_Args args)
 {
     unused(user_ptr);
-    unused(old_size);
-    unused(align);
     switch (mode) {
-    case ALLOCATOR_MALLOC:
-    case ALLOCATOR_MRESIZE: {
-        void *new_ptr = realloc(old_ptr, new_size);
+    case ALLOCATOR_MODE_ALLOC:
+    case ALLOCATOR_MODE_RESIZE: {
+        void *new_ptr = realloc(args.old_ptr, args.new_size);
         // If `realloc` fails, `old_ptr` is not freed.
         if (new_ptr == NULL)
-            free(old_ptr);
+            free(args.old_ptr);
         return new_ptr;
     }
-    case ALLOCATOR_MFREE: {
-        free(old_ptr);
+    case ALLOCATOR_MODE_FREE: {
+        free(args.old_ptr);
         return NULL;
     }
     default:
@@ -34,20 +32,18 @@ heap_allocator_fn(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t old
 }
 
 static void *
-panic_allocator_fn(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t old_size, size_t new_size, size_t align)
+panic_allocator_fn(void *user_ptr, Allocator_Mode mode, Allocator_Args args)
 {
     unused(user_ptr);
-    unused(old_size);
-    unused(align);
     switch (mode) {
-    case ALLOCATOR_MALLOC:
-    case ALLOCATOR_MRESIZE: {
-        void *new_ptr = realloc(old_ptr, new_size);
+    case ALLOCATOR_MODE_ALLOC:
+    case ALLOCATOR_MODE_RESIZE: {
+        void *new_ptr = realloc(args.old_ptr, args.new_size);
         assert(new_ptr != NULL);
         return new_ptr;
     }
-    case ALLOCATOR_MFREE: {
-        free(old_ptr);
+    case ALLOCATOR_MODE_FREE: {
+        free(args.old_ptr);
         return NULL;
     }
     default:
@@ -56,18 +52,14 @@ panic_allocator_fn(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t ol
 }
 
 static void *
-nil_allocator_fn(void *user_ptr, Allocator_Mode mode, void *old_ptr, size_t old_size, size_t new_size, size_t align)
+nil_allocator_fn(void *user_ptr, Allocator_Mode mode, Allocator_Args args)
 {
     unused(user_ptr);
-    unused(old_ptr);
-    unused(old_size);
-    unused(new_size);
-    unused(align);
-
+    unused(args);
     switch (mode) {
-    case ALLOCATOR_MALLOC:
-    case ALLOCATOR_MRESIZE:
-    case ALLOCATOR_MFREE:
+    case ALLOCATOR_MODE_ALLOC:
+    case ALLOCATOR_MODE_RESIZE:
+    case ALLOCATOR_MODE_FREE:
         break;
     default:
         __builtin_unreachable();
@@ -115,17 +107,35 @@ mem_delete(void *ptr, size_t count, size_t size, Allocator allocator)
 void *
 mem_rawnew(size_t size, size_t align, Allocator allocator)
 {
-    return allocator.fn(allocator.user_ptr, ALLOCATOR_MALLOC, NULL, 0, size, align);
+    Allocator_Args args = {
+        .old_ptr    = NULL,
+        .old_size   = 0,
+        .new_size   = size,
+        .alignment  = align,
+    };
+    return allocator.fn(allocator.user_ptr, ALLOCATOR_MODE_ALLOC, args);
 }
 
 void *
 mem_rawresize(void *old_ptr, size_t old_size, size_t new_size, size_t align, Allocator allocator)
 {
-    return allocator.fn(allocator.user_ptr, ALLOCATOR_MRESIZE, old_ptr, old_size, new_size, align);
+    Allocator_Args args = {
+        .old_ptr    = old_ptr,
+        .old_size   = old_size,
+        .new_size   = new_size,
+        .alignment  = align,
+    };
+    return allocator.fn(allocator.user_ptr, ALLOCATOR_MODE_RESIZE, args);
 }
 
 void
 mem_rawfree(void *ptr, size_t size, Allocator allocator)
 {
-    allocator.fn(allocator.user_ptr, ALLOCATOR_MFREE, ptr, size, 0, 0);
+    Allocator_Args args = {
+        .old_ptr    = ptr,
+        .old_size   = size,
+        .new_size   = 0,
+        .alignment  = 0,
+    };
+    allocator.fn(allocator.user_ptr, ALLOCATOR_MODE_FREE, args);
 }

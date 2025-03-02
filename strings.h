@@ -177,19 +177,19 @@ void
 string_builder_reset(String_Builder *builder);
 
 bool
-string_builder_append_char(String_Builder *builder, char ch);
+string_append_char(String_Builder *builder, char ch);
 
 bool
-string_builder_append_string(String_Builder *builder, String text);
+string_append_string(String_Builder *builder, String text);
 
 bool
-string_builder_append_cstring(String_Builder *builder, const char *text);
+string_append_cstring(String_Builder *builder, const char *text);
 
 String
-string_builder_to_string(const String_Builder *builder);
+string_to_string(const String_Builder *builder);
 
 const char *
-string_builder_to_cstring(const String_Builder *builder);
+string_to_cstring(const String_Builder *builder);
 
 // }}} -------------------------------------------------------------------------
 
