@@ -6,25 +6,34 @@
 
 #include "common.h"
 
-typedef enum {
+enum Allocator_Mode {
     ALLOCATOR_MODE_ALLOC,
     ALLOCATOR_MODE_RESIZE,
     ALLOCATOR_MODE_FREE,
-} Allocator_Mode;
+};
+typedef enum Allocator_Mode Allocator_Mode;
 
-typedef struct {
+typedef struct Allocator_Args Allocator_Args;
+struct Allocator_Args {
     void  *old_ptr;
     size_t old_size;
     size_t new_size;
     size_t alignment;
-} Allocator_Args;
+};
+
+enum Allocator_Error {
+    ALLOCATOR_ERROR_NONE,
+    ALLOCATOR_ERROR_OUT_OF_MEMORY,
+};
+typedef enum Allocator_Error Allocator_Error;
 
 typedef void *(*Allocator_Fn)(void *user_ptr, Allocator_Mode mode, Allocator_Args args);
 
-typedef struct {
+typedef struct Allocator Allocator;
+struct Allocator {
     Allocator_Fn fn;
-    void *user_ptr;
-} Allocator;
+    void        *user_ptr;
+};
 
 extern const Allocator
 HEAP_ALLOCATOR,

@@ -173,17 +173,29 @@ string_builder_make(Allocator allocator);
 String_Builder
 string_builder_make_fixed(char *buffer, size_t cap);
 
+size_t
+string_builder_len(String_Builder *builder);
+
 void
 string_builder_reset(String_Builder *builder);
 
-bool
+Allocator_Error
 string_append_char(String_Builder *builder, char ch);
 
-bool
+Allocator_Error
 string_append_string(String_Builder *builder, String text);
 
-bool
+Allocator_Error
 string_append_cstring(String_Builder *builder, const char *text);
+
+Allocator_Error
+string_prepend_char(String_Builder *builder, char ch);
+
+Allocator_Error
+string_prepend_string(String_Builder *builder, String text);
+
+Allocator_Error
+string_prepend_cstring(String_Builder *builder, const char *text);
 
 String
 string_to_string(const String_Builder *builder);

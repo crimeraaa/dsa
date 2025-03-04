@@ -6,7 +6,7 @@
 #include "types.h"
 
 static void
-run_interactive(void)
+run_interactive(Type_Table *table)
 {
     char buf[512];
     for (;;) {
@@ -16,11 +16,11 @@ run_interactive(void)
             break;
         }
 
-        String name = {.data = buf, .len = strcspn(buf, "\r\n")};
-        printfln(STRING_QFMTSPEC, STRING_FMTARG(name));
-        if (!type_parse_string(name)) {
-            printfln("Invalid type " STRING_QFMTSPEC ".",
-                STRING_FMTARG(name));
+        size_t len = strcspn(buf, "\r\n");
+        buf[len] = '\0';
+        printfln("\'%s\'", buf);
+        if (!type_parse_string(table, buf, len)) {
+            printfln("Invalid type '%s'.", buf);
         }
     }
 }
@@ -28,6 +28,8 @@ run_interactive(void)
 int
 main(void)
 {
-    run_interactive();
+    Type_Table table = type_table_make(HEAP_ALLOCATOR);
+    run_interactive(&table);
+    type_table_destroy(&table);
     return 0;
 }
