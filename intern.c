@@ -136,7 +136,7 @@ _intern_resize(Intern *intern, size_t new_cap)
 }
 
 static void
-swap(Intern_Entry *a, Intern_Entry *b)
+swap(Intern_Entry *restrict a, Intern_Entry *restrict b)
 {
     Intern_Entry tmp = *a;
     *a = *b;

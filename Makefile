@@ -2,21 +2,15 @@ CC := clang
 
 DEBUG_FLAGS := -fsanitize=address -O0 -g
 RELEASE_FLAGS := -O1 -g
+CC_FLAGS := -std=c11 -Wall -Wextra -Wconversion -pedantic
 
-FLAGS := $(RELEASE_FLAGS)
+SRC := $(wildcard *.c) $(wildcard types/*.c)
 
-# Do not use `:=` because we want lazy evaluation of `FLAGS`.
-CC_FLAGS = -std=c11 -Wall -Wextra -Wconversion -pedantic $(FLAGS)
-
-SRC := $(wildcard *.c)
+debug: CC_FLAGS += $(DEBUG_FLAGS)
+debug: main
 
 main: $(SRC)
 	$(CC) $(CC_FLAGS) -o $@ $^
 
-debug: FLAGS := $(DEBUG_FLAGS)
-debug: main
-
-release: FLAGS := $(RELEASE_FLAGS)
+release: CC_FLAGS += $(RELEASE_FLAGS)
 release: main
-
-%.c: %.h

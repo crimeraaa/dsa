@@ -13,6 +13,12 @@ ascii_is_digit(char ch)
 }
 
 bool
+ascii_is_alnum(char ch)
+{
+    return ascii_is_alpha(ch) || ascii_is_digit(ch);
+}
+
+bool
 ascii_is_upper(char ch)
 {
     return 'A' <= ch && ch <= 'Z';

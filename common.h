@@ -16,7 +16,7 @@
 
 #ifndef count_of
 #define count_of(literal) (sizeof(literal) / sizeof((literal)[0]))
-#endif // counf_of
+#endif // count_of
 
 #define printfln(fmt, ...)  printf(fmt "\n", __VA_ARGS__)
 #define println(msg)        printfln("%s", msg)

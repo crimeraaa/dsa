@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common.h"
-#include "strings.h"
-#include "intern.h"
+#include "../common.h"
+#include "../strings.h"
+#include "../intern.h"
 
 /**
  * @brief
@@ -36,6 +36,9 @@ enum Type_Base {
 };
 typedef enum Type_Base Type_Base;
 
+extern const String
+TYPE_BASE_STRINGS[TYPE_BASE_COUNT];
+
 enum Type_Modifier {
     TYPE_MOD_NONE,
     TYPE_MOD_SIGNED,
@@ -44,6 +47,9 @@ enum Type_Modifier {
     TYPE_MOD_COUNT,
 };
 typedef enum Type_Modifier Type_Modifier;
+
+extern const String
+TYPE_MOD_STRINGS[TYPE_MOD_COUNT];
 
 #define BIT(N)  (1 << (N))
 
@@ -62,6 +68,9 @@ enum Type_Qualifier {
     TYPE_QUAL_COUNT,
 };
 typedef enum Type_Qualifier Type_Qualifier;
+
+extern const String
+TYPE_QUAL_STRINGS[TYPE_QUAL_COUNT];
 
 typedef struct Type_Table           Type_Table;
 typedef struct Type_Table_Entry     Type_Table_Entry;

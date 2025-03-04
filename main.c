@@ -3,7 +3,9 @@
 #include "allocator.h"
 #include "strings.h"
 #include "intern.h"
-#include "types.h"
+
+#include "types/types.h"
+#include "types/lexer.h"
 
 static void
 run_interactive(Type_Table *table)

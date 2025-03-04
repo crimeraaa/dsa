@@ -9,6 +9,9 @@ bool
 ascii_is_digit(char ch);
 
 bool
+ascii_is_alnum(char ch);
+
+bool
 ascii_is_upper(char ch);
 
 bool

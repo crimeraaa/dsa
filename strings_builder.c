@@ -96,9 +96,9 @@ string_prepend_string(String_Builder *builder, String text)
     // Move the old text to the new location.
     // e.g. given "hi mom!" (len = 7), prepend "yay " (len = 4)
     //      1. Resize builder to be "hi mom!1234" (len = 11) NOTE: have garbage!
-    //      2. Copy old text "hi mom!" to new location (4): "hi mhi mom!"
+    //      2. Move old text "hi mom!" to new location (4): "hi mhi mom!"
     //      3. Copy new text to old location (0): "yay hi mom!"
-    memcpy(&builder->buffer[text.len], &builder->buffer[0], builder->len);
+    memmove(&builder->buffer[text.len], &builder->buffer[0], builder->len);
     memcpy(&builder->buffer[0],        text.data, text.len);
     builder->buffer[builder->len += text.len] = '\0';
     return ALLOCATOR_ERROR_NONE;
