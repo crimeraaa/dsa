@@ -26,6 +26,12 @@ string_builder_make_fixed(char *buffer, size_t cap)
     return builder;
 }
 
+void
+string_builder_destroy(String_Builder *builder)
+{
+    mem_delete(builder->buffer, builder->cap, builder->allocator);
+}
+
 size_t
 string_builder_len(String_Builder *builder)
 {

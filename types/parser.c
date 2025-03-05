@@ -237,8 +237,8 @@ _parser_finalize(Type_Parser *parser, Type_Parser_Data *data, bool is_pointee)
 
 static void
 _parser_write_qualifier(const Type_Parser_Data *data, String_Builder *builder, Type_Qualifier qualifier)
-    {
-        if (data->qualifiers & BIT(qualifier)) {
+{
+    if (data->qualifiers & BIT(qualifier)) {
         string_append_string(builder, TYPE_QUAL_STRINGS[qualifier]);
         string_append_char(builder, ' ');
     }
@@ -252,24 +252,20 @@ _parser_try_write_qualifiers(const Type_Parser_Data *data, String_Builder *build
     _parser_write_qualifier(data, builder, TYPE_QUAL_RESTRICT);
 }
 
-static void
-_parser_write(const Type_Parser_Data *data)
+static const char *
+_parser_write(const Type_Parser_Data *data, String_Builder *builder)
 {
-    // We will only do this for up to the first pointer. E.g. given `int *const`,
-    // we will first build the string `int *`.
-    char buf[256];
-    String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
-
     if (data->pointee != NULL) {
-        _parser_write(data->pointee);
+        // This is just an intermediate result, we don't care about it.
+        _parser_write(data->pointee, builder);
     }
 
     if (!_parser_data_is_pointer(data))
-        _parser_try_write_qualifiers(data, &builder);
+        _parser_try_write_qualifiers(data, builder);
 
     switch (data->modifier) {
     case TYPE_MOD_NONE: write_type_only:
-        string_append_string(&builder, TYPE_BASE_STRINGS[data->base]);
+        string_append_string(builder, TYPE_BASE_STRINGS[data->base]);
         break;
     case TYPE_MOD_SIGNED:
         if (data->base != TYPE_BASE_CHAR)
@@ -277,27 +273,27 @@ _parser_write(const Type_Parser_Data *data)
         // Fallthrough
     case TYPE_MOD_UNSIGNED:
     case TYPE_MOD_COMPLEX:
-        string_append_string(&builder, TYPE_MOD_STRINGS[data->modifier]);
-        string_append_char(&builder, ' ');
-        string_append_string(&builder, TYPE_BASE_STRINGS[data->base]);
+        string_append_string(builder, TYPE_MOD_STRINGS[data->modifier]);
+        string_append_char(builder, ' ');
+        string_append_string(builder, TYPE_BASE_STRINGS[data->base]);
         break;
     default:
         break;
     }
 
     if (_parser_data_is_pointer(data)) {
-        string_append_cstring(&builder, " *");
-        _parser_try_write_qualifiers(data, &builder);
+        string_append_cstring(builder, " *");
+        _parser_try_write_qualifiers(data, builder);
     }
-
-    print(string_to_cstring(&builder));
+    return string_to_cstring(builder);
 }
 
 void
 type_parser_parse(Type_Parser *parser, int recurse)
 {
-    Type_Token token;
-    int        steps = 1;
+    Type_Token     token;
+    int            steps   = 1;
+    String_Builder builder = string_builder_make(parser->allocator);
 
 loop_start:
     // Ugly to use goto like this but it works for our purposes...
@@ -352,9 +348,8 @@ loop_start:
         parser->data = pointer;
         _parser_finalize(parser, pointer->pointee, true);
         
-        print("Pointer to: '");
-        _parser_write(pointer->pointee);
-        println("'");
+        printfln("Pointer to: '%s'", _parser_write(pointer->pointee, &builder));
+        string_builder_reset(&builder);
         
         // This will continue the loop.
         break;
@@ -374,7 +369,6 @@ loop_start:
         goto loop_start;
 
     _parser_finalize(parser, parser->data, false);
-    printf("Final Type: '");
-    _parser_write(parser->data);
-    println("'");
+    printfln("Final Type: '%s'", _parser_write(parser->data, &builder));
+    string_builder_destroy(&builder);
 }

@@ -17,11 +17,9 @@
 #include "types/lexer.h"
 
 static void
-run_interactive(Type_Table *table)
+run_interactive(Type_Table *table, Arena *arena)
 {
-    Arena    *arena          = arena_make();
-    Allocator temp_allocator = arena_to_allocator(arena);
-
+    Allocator temp_allocator = arena_allocator(arena);
     char buf[512];
     for (;;) {
         fputs(">>> ", stdout);
@@ -38,14 +36,15 @@ run_interactive(Type_Table *table)
         }
         mem_free_all(temp_allocator);
     }
-    arena_destroy(arena);
 }
 
 int
 main(void)
 {
+    Arena      arena = arena_make();
     Type_Table table = type_table_make(GLOBAL_PANIC_ALLOCATOR);
-    run_interactive(&table);
+    run_interactive(&table, &arena);
     type_table_destroy(&table);
+    arena_destroy(&arena);
     return 0;
 }

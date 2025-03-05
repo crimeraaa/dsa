@@ -172,6 +172,9 @@ string_builder_make(Allocator allocator);
 String_Builder
 string_builder_make_fixed(char *buffer, size_t cap);
 
+void
+string_builder_destroy(String_Builder *builder);
+
 size_t
 string_builder_len(String_Builder *builder);
 
