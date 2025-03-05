@@ -52,10 +52,11 @@ _string_builder_check_resize(String_Builder *builder, size_t extra)
     size_t cap = builder->cap;
     // Need to fit resulting text along with nul termination as well.
     if (builder->len + extra + 1 >= cap) {
-        size_t new_cap = (cap == 0) ? 8 : cap * 2;
-        char  *new_buffer = mem_resize(char, builder->buffer, cap, new_cap, builder->allocator);
-        if (new_buffer == NULL)
-            return ALLOCATOR_ERROR_OUT_OF_MEMORY;
+        size_t          new_cap = (cap == 0) ? 8 : cap * 2;
+        Allocator_Error error;
+        char           *new_buffer = mem_resize(char, &error, builder->buffer, cap, new_cap, builder->allocator);
+        if (error)
+            return error;
         builder->buffer = cast(char *)memcpy(new_buffer, builder->buffer, cap);
         builder->cap    = new_cap;
     }

@@ -28,6 +28,7 @@ struct Type_Parser_Data {
 // `Type_Info` is misleading in my opinion because this is very restrictive.
 typedef struct Type_Parser Type_Parser;
 struct Type_Parser {
+    Allocator           allocator;
     Type_Lexer          lexer;
     Type_Token          consumed;
     Type_Table         *table;

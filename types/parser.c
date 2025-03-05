@@ -340,27 +340,25 @@ loop_start:
 
     case TYPE_TOKEN_VOID:       _parser_set_base(parser, token, TYPE_BASE_VOID); break;
     case TYPE_TOKEN_ASTERISK: {
-        Type_Parser_Data pointer = {
-            .pointee    = parser->data,
-            .base       = TYPE_BASE_POINTER,
-            .modifier   = TYPE_MOD_NONE,
-            .qualifiers = 0,
-        };
-        parser->data = &pointer;
-        // WARNING: If we throw an error at any point, `parser->data` will likely
-        // be a dangling pointer at the outermost caller's location!
-        _parser_finalize(parser, pointer.pointee, true);
+        Allocator_Error   error;
+        Type_Parser_Data *pointer = mem_new(Type_Parser_Data, &error, parser->allocator);
+        if (error != ALLOCATOR_ERROR_NONE)
+            _parser_throw_error(parser, TYPE_PARSE_INVALID);
+
+        pointer->pointee    = parser->data;
+        pointer->base       = TYPE_BASE_POINTER;
+        pointer->modifier   = TYPE_MOD_NONE;
+        pointer->qualifiers = 0;
+
+        parser->data = pointer;
+        _parser_finalize(parser, pointer->pointee, true);
         
         print("Pointer to: '");
-        _parser_write(pointer.pointee);
+        _parser_write(pointer->pointee);
         println("'");
-
-        // We use `parser->data` outside of function calls, hence the reset.
-        type_parser_parse(parser, state, recurse + 1);
-        parser->data = pointer.pointee;
         
-        // Return, don't break as we don't want to print/check the lone pointee.
-        return;
+        // This will continue the loop.
+        break;
     }
     case TYPE_TOKEN_EOF:
         break;

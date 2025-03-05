@@ -134,4 +134,4 @@ const Type_Info *
 type_get_by_info(Type_Table *table, Type_Info info);
 
 bool
-type_parse_string(Type_Table *table, const char *text, size_t len);
+type_parse_string(Type_Table *table, const char *text, size_t len, Allocator allocator);

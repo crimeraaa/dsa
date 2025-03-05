@@ -42,20 +42,26 @@ TYPE_QUAL_STRINGS[TYPE_QUAL_COUNT] = {
 #undef lit
 
 bool
-type_parse_string(Type_Table *table, const char *text, size_t len)
+type_parse_string(Type_Table *table, const char *text, size_t len, Allocator allocator)
 {
-    Error_Handler handler;
+    Error_Handler     handler;
+    Allocator_Error   error;
+    Type_Parser_Data *data = mem_new(Type_Parser_Data, &error, allocator);
+    if (error != ALLOCATOR_ERROR_NONE)
+        return false;
+    
+    data->pointee    = NULL;
+    data->base       = TYPE_BASE_NONE;
+    data->modifier   = TYPE_MOD_NONE;
+    data->qualifiers = 0;
+
     Type_Parser parser = {
+        .allocator  = allocator,
         .lexer      = type_lexer_make(text, len),
         .consumed   = {0},
         .handler    = &handler,
         .table      = table,
-        .data       = &(Type_Parser_Data){
-            .pointee    = NULL,
-            .base       = TYPE_BASE_NONE,
-            .modifier   = TYPE_MOD_NONE,
-            .qualifiers = 0,
-        },
+        .data       = data,
     };
     
     handler.error = TYPE_PARSE_NONE;
@@ -207,20 +213,21 @@ type_add(Type_Table *table, const char *base_name, Type_Info info)
             return ALLOCATOR_ERROR_NONE;
     }
 
+    Allocator_Error error;
     // Need to grow the dynamic array?
     const size_t cap = table->cap;
     if (len >= cap) {
         size_t            new_cap     = (cap == 0) ? 8 : cap * 2;
-        Type_Table_Entry *new_entries = mem_resize(Type_Table_Entry, table->entries, cap, new_cap, table->intern.allocator);
-        if (new_entries == NULL)
-            return ALLOCATOR_ERROR_OUT_OF_MEMORY;
+        Type_Table_Entry *new_entries = mem_resize(Type_Table_Entry, &error, table->entries, cap, new_cap, table->intern.allocator);
+        if (error)
+            return error;
         table->entries = new_entries;
         table->cap     = new_cap;
     }
 
-    Type_Info *new_info = mem_new(Type_Info, table->intern.allocator);
-    if (new_info == NULL)
-        return ALLOCATOR_ERROR_OUT_OF_MEMORY;
+    Type_Info *new_info = mem_new(Type_Info, &error, table->intern.allocator);
+    if (error)
+        return error;
     *new_info = info;
 
     Type_Table_Entry *entry = &table->entries[table->len++];

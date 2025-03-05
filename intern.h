@@ -5,7 +5,7 @@
 
 #include "common.h"
 #include "strings.h"
-#include "allocator.h"
+#include "mem/allocator.h"
 
 // Opaque type so you don't get any funny ideas!
 typedef struct Intern_Entry Intern_Entry;
@@ -155,13 +155,14 @@ _intern_update_max_probe(Intern *intern, int probe)
         intern->max_probe = probe;
 }
 
-static bool
+static Allocator_Error
 _intern_resize(Intern *intern, size_t new_cap)
 {
-    Allocator     allocator   = intern->allocator;
-    Intern_Entry *new_entries = mem_make(Intern_Entry, new_cap, allocator);
-    if (new_entries == NULL)
-        return false;
+    Allocator       allocator   = intern->allocator;
+    Allocator_Error error;
+    Intern_Entry   *new_entries = mem_make(Intern_Entry, &error, new_cap, allocator);
+    if (error)
+        return error;
 
     // Zero out the new memory so that we can safely read them.
     memset(new_entries, 0, sizeof(new_entries[0]) * new_cap);
@@ -194,7 +195,7 @@ _intern_resize(Intern *intern, size_t new_cap)
     intern->entries = new_entries;
     intern->count   = new_count;
     intern->cap     = new_cap;
-    return true;
+    return error;
 }
 
 static void
@@ -224,14 +225,16 @@ _intern_set(Intern *intern, String text, uint32_t hash)
         cap = new_cap;
     }
 
+    Allocator_Error error;
     // Add 1 for nul terminator.
     Intern_String *value = cast(Intern_String *)mem_rawnew(
+        &error,
         sizeof(*value) + sizeof(value->data[0]) * (text.len + 1),
         alignof(Intern_String), // alignof(*value) is an extension MSVC doesn't have
         intern->allocator
     );
 
-    if (value == NULL)
+    if (error)
         return NULL;
 
     value->len  = text.len;
@@ -258,7 +261,7 @@ _intern_set(Intern *intern, String text, uint32_t hash)
 
         _intern_update_max_probe(intern, ++entry.probe);
     }
-    __builtin_unreachable();
+    assert(false);
 }
 
 String

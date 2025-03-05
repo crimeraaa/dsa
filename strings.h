@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common.h"
-#include "allocator.h"
+#include "mem/allocator.h"
 
 typedef struct {
     const char *data;

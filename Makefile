@@ -5,7 +5,7 @@ RELEASE_FLAGS := -O1 -g
 CC_FLAGS := -std=c11 -Wall -Wextra -Wconversion -pedantic
 
 SOURCES := $(wildcard *.c) $(wildcard types/*.c)
-HEADERS := $(wildcard *.h) $(wildcard types/*.h)
+HEADERS := $(wildcard *.h) $(wildcard types/*.h) $(wildcard mem/*.h)
 
 debug: CC_FLAGS += $(DEBUG_FLAGS)
 debug: main
