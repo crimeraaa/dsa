@@ -6,7 +6,7 @@
 
 /**
  * @brief
- *      'basic' types are the first step in determining what a type even *is*.
+ *      'base' types are the first step in determining what a type even *is*.
  *
  * @note
  *      We do not consider modifiers such as `signed`, `unsigned`, `complex`,
@@ -23,7 +23,7 @@ enum Type_Base {
 
     TYPE_BASE_FLOAT,
     TYPE_BASE_DOUBLE,
-    TYPE_BASE_LONG_DOUBLE, // ugh
+    TYPE_BASE_LONG_DOUBLE, // aliases: `double long`
 
     TYPE_BASE_VOID,
     TYPE_BASE_POINTER,
@@ -43,7 +43,7 @@ enum Type_Modifier {
     TYPE_MOD_NONE,
     TYPE_MOD_SIGNED,
     TYPE_MOD_UNSIGNED,
-    TYPE_MOD_COMPLEX,
+    TYPE_MOD_COMPLEX,   // `complex float`, `complex double`, `complex long double` and variants thereof.
     TYPE_MOD_COUNT,
 };
 typedef enum Type_Modifier Type_Modifier;
@@ -95,7 +95,7 @@ struct Type_Info_Floating {
 };
 
 struct Type_Info {
-    Type_Base basic;
+    Type_Base base;
     union {
         Type_Info_Integer   integer;
         Type_Info_Floating  floating;

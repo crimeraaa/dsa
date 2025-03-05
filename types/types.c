@@ -52,7 +52,7 @@ type_parse_string(Type_Table *table, const char *text, size_t len)
         .table      = table,
         .data       = &(Type_Parser_Data){
             .pointee    = NULL,
-            .basic      = TYPE_BASE_NONE,
+            .base       = TYPE_BASE_NONE,
             .modifier   = TYPE_MOD_NONE,
             .qualifiers = 0,
         },
@@ -69,14 +69,14 @@ type_parse_string(Type_Table *table, const char *text, size_t len)
 }
 
 static const struct {
-    Type_Base    basic;
-    const char   *base_name;
+    Type_Base   base;
+    const char *base_name;
 } TYPE_INFO_INTEGERS[] = {
-    {.basic = TYPE_BASE_CHAR,      .base_name = "char"},
-    {.basic = TYPE_BASE_SHORT,     .base_name = "short"},
-    {.basic = TYPE_BASE_INT,       .base_name = "int"},
-    {.basic = TYPE_BASE_LONG,      .base_name = "long"},
-    {.basic = TYPE_BASE_LONG_LONG, .base_name = "long long"},
+    {.base = TYPE_BASE_CHAR,      .base_name = "char"},
+    {.base = TYPE_BASE_SHORT,     .base_name = "short"},
+    {.base = TYPE_BASE_INT,       .base_name = "int"},
+    {.base = TYPE_BASE_LONG,      .base_name = "long"},
+    {.base = TYPE_BASE_LONG_LONG, .base_name = "long long"},
 };
 
 Type_Table
@@ -91,13 +91,13 @@ type_table_make(Allocator allocator)
 
     for (size_t i = 0; i < count_of(TYPE_INFO_INTEGERS); ++i) {
         Type_Info info = {
-            .basic = TYPE_INFO_INTEGERS[i].basic,
+            .base    = TYPE_INFO_INTEGERS[i].base,
             .integer = {.modifier = TYPE_MOD_SIGNED, .qualifiers = 0},
         };
         char buf[64];
         String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
-        string_append_string(&builder, TYPE_BASE_STRINGS[info.basic]);
-        if (info.basic == TYPE_BASE_CHAR) {
+        string_append_string(&builder, TYPE_BASE_STRINGS[info.base]);
+        if (info.base == TYPE_BASE_CHAR) {
             info.integer.modifier = TYPE_MOD_NONE;
         }
         type_add(&table, string_to_cstring(&builder), info);
@@ -105,7 +105,7 @@ type_table_make(Allocator allocator)
         // `signed char` is distinct from `char`.
         string_prepend_char(&builder, ' ');
         string_prepend_string(&builder, TYPE_MOD_STRINGS[info.integer.modifier = TYPE_MOD_SIGNED]);
-        if (info.basic == TYPE_BASE_CHAR)
+        if (info.base == TYPE_BASE_CHAR)
             type_add(&table, string_to_cstring(&builder), info);
 
         // All `unsigned` types are distinct from their base types.
@@ -159,10 +159,10 @@ type_table_destroy(Type_Table *table)
 static bool
 type_info_eq(const Type_Info *a, const Type_Info *b)
 {
-    if (a->basic != b->basic)
+    if (a->base != b->base)
         return false;
 
-    switch (a->basic) {
+    switch (a->base) {
     // Integer
     case TYPE_BASE_CHAR:
     case TYPE_BASE_SHORT:

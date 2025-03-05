@@ -18,7 +18,7 @@ String_Builder
 string_builder_make_fixed(char *buffer, size_t cap)
 {
     String_Builder builder = {
-        .allocator = NIL_ALLOCATOR,
+        .allocator = GLOBAL_NONE_ALLOCATOR,
         .buffer    = buffer,
         .len       = 0,
         .cap       = cap,

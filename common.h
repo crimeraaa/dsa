@@ -1,6 +1,6 @@
-#ifndef COMMON_H
-#define COMMON_H
+#pragma once
 
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -18,6 +18,7 @@
 #define count_of(literal) (sizeof(literal) / sizeof((literal)[0]))
 #endif // count_of
 
+#define print(msg)          printf("%s", msg)
 #define printfln(fmt, ...)  printf(fmt "\n", __VA_ARGS__)
 #define println(msg)        printfln("%s", msg)
 
@@ -29,5 +30,3 @@
 #define eprint(msg)         eprintf("%s", msg)
 #define eprintfln(fmt, ...) eprintf(fmt "\n", __VA_ARGS__)
 #define eprintln(msg)       eprintfln("%s", msg)
-
-#endif // COMMON_H

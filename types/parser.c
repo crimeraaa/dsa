@@ -3,27 +3,27 @@
 #include <assert.h>
 
 static bool
-_parser_is_integer(const Type_Parser *parser)
+_parser_data_is_integer(const Type_Parser_Data *data)
 {
-    return TYPE_BASE_CHAR <= parser->data->basic && parser->data->basic <= TYPE_BASE_LONG_LONG;
+    return TYPE_BASE_CHAR <= data->base && data->base <= TYPE_BASE_LONG_LONG;
 }
 
 static bool
-_parser_is_floating(const Type_Parser *parser)
+_parser_data_is_floating(const Type_Parser_Data *data)
 {
-    return TYPE_BASE_FLOAT <= parser->data->basic && parser->data->basic <= TYPE_BASE_LONG_DOUBLE;
+    return TYPE_BASE_FLOAT <= data->base && data->base <= TYPE_BASE_LONG_DOUBLE;
 }
 
 static bool
-_parser_is_pointer(const Type_Parser *parser)
+_parser_data_is_pointer(const Type_Parser_Data *data)
 {
-    return parser->data->basic == TYPE_BASE_POINTER;
+    return data->base == TYPE_BASE_POINTER;
 }
 
 static bool
-_parser_has_qualifier(const Type_Parser *parser, Type_Qualifier qualifier)
+_parser_data_has_qualifier(const Type_Parser_Data *data, Type_Qualifier qualifier)
 {
-    return parser->data->qualifiers & BIT(qualifier);
+    return data->qualifiers & BIT(qualifier);
 }
 
 static void
@@ -35,12 +35,12 @@ _parser_throw_error(Type_Parser *parser, Type_Parse_Error error)
 }
 
 static void
-_parser_set_basic(Type_Parser *parser, Type_Token token, Type_Base expected)
+_parser_set_base(Type_Parser *parser, Type_Token token, Type_Base expected)
 {
     // Was previously set?
-    if (parser->data->basic != TYPE_BASE_NONE) switch (parser->data->basic) {
+    if (parser->data->base != TYPE_BASE_NONE) switch (parser->data->base) {
     case TYPE_BASE_SHORT:
-        // Allow `short int`. Do not update `basic->info` because we are
+        // Allow `short int`. Do not update `parser->data->base` because we are
         // already of the correct type.
         if (expected == TYPE_BASE_INT)
             goto success;
@@ -53,11 +53,11 @@ _parser_set_basic(Type_Parser *parser, Type_Token token, Type_Base expected)
          *
          * @note
          *      In `int long long`, we would have first parsed `int long` so
-         *      `basic->type` is `TYPE_BASE_LONG`, thus we would never reach
+         *      `parser->data->base` is `TYPE_BASE_LONG`, thus we would never reach
          *       here.
          */
         if (expected == TYPE_BASE_SHORT || expected == TYPE_BASE_LONG) {
-            parser->data->basic = expected;
+            parser->data->base = expected;
             goto success;
         }
         goto invalid_combination;
@@ -69,39 +69,40 @@ _parser_set_basic(Type_Parser *parser, Type_Token token, Type_Base expected)
         }
         // Allow `long long`.
         else if (expected == TYPE_BASE_LONG) {
-            parser->data->basic = TYPE_BASE_LONG_LONG;
+            parser->data->base = TYPE_BASE_LONG_LONG;
             goto success;
         }
         // Allow `long double`.
         else if (expected == TYPE_BASE_DOUBLE) {
-            parser->data->basic = TYPE_BASE_LONG_DOUBLE;
+            parser->data->base = TYPE_BASE_LONG_DOUBLE;
             goto success;
         }
         goto invalid_combination;
 
-    // Allow `long long int`.
     case TYPE_BASE_LONG_LONG:
+        // Allow `long long int`.
         if (expected == TYPE_BASE_INT)
             goto success;
         goto invalid_combination;
 
     case TYPE_BASE_DOUBLE:
+        // Alloc `double long`.
         if (expected == TYPE_BASE_LONG) {
-            parser->data->basic = TYPE_BASE_LONG_DOUBLE;
+            parser->data->base = TYPE_BASE_LONG_DOUBLE;
             goto success;
         }
         goto invalid_combination;
 
     default: invalid_combination:
         printfln("ERROR: Invalid type combination " STRING_QFMTSPEC " and \'%s\'",
-            STRING_FMTARG(token.word),
+            string_fmtarg(token.word),
             TYPE_BASE_STRINGS[expected].data);
         _parser_throw_error(parser, TYPE_PARSE_INVALID);
         return;
     }
-    parser->data->basic = expected;
+    parser->data->base = expected;
 success:
-    printfln("Type '%s'", TYPE_BASE_STRINGS[parser->data->basic].data);
+    printfln("Type: '%s'", TYPE_BASE_STRINGS[parser->data->base].data);
 }
 
 static void
@@ -110,22 +111,22 @@ _parser_set_modifier(Type_Parser *parser, Type_Token token, Type_Modifier expect
     // You cannot repeat or combine modifiers, e.g. `signed signed int` or `signed complex float`.
     if (parser->data->modifier != TYPE_MOD_NONE) {
         printfln("ERROR: Already have modifier " STRING_QFMTSPEC " but got '%s'",
-            STRING_FMTARG(token.word),
+            string_fmtarg(token.word),
             TYPE_MOD_STRINGS[expected].data);
         _parser_throw_error(parser, TYPE_PARSE_INVALID);
     }
 
-    if (parser->data->basic != TYPE_BASE_NONE) {
+    if (parser->data->base != TYPE_BASE_NONE) {
         switch (expected) {
         case TYPE_MOD_SIGNED: // fallthrough
         case TYPE_MOD_UNSIGNED:
-            if (!_parser_is_integer(parser))
+            if (!_parser_data_is_integer(parser->data))
                 goto invalid_combination;
             break;
         case TYPE_MOD_COMPLEX:
-            if (!_parser_is_floating(parser)) invalid_combination: {
+            if (!_parser_data_is_floating(parser->data)) invalid_combination: {
                 printfln("ERROR: Invalid type and modifier '%s' and '%s'",
-                    TYPE_BASE_STRINGS[parser->data->basic].data,
+                    TYPE_BASE_STRINGS[parser->data->base].data,
                     TYPE_MOD_STRINGS[expected].data);
                 _parser_throw_error(parser, TYPE_PARSE_INVALID);
                 return;
@@ -146,7 +147,7 @@ _parser_set_qualifier(Type_Parser *parser, Type_Qualifier expected)
     // This qualifier was previously set?
     // `const const int` is valid in C99 and above, but I dislike it.
     // https://stackoverflow.com/questions/5781222/duplicate-const-qualifier-allowed-in-c-but-not-in-c
-    if (_parser_has_qualifier(parser, expected)) {
+    if (_parser_data_has_qualifier(parser->data, expected)) {
         printfln("ERROR: Duplicate qualifier '%s'", TYPE_QUAL_STRINGS[expected].data);
         _parser_throw_error(parser, TYPE_PARSE_INVALID);
         return;
@@ -157,19 +158,19 @@ _parser_set_qualifier(Type_Parser *parser, Type_Qualifier expected)
 
 // Ensure modifiers and qualifiers are valid for their basic types.
 static void
-_parser_check(Type_Parser *parser)
+_parser_check(Type_Parser *parser, Type_Parser_Data *data)
 {
-    switch (parser->data->modifier) {
+    switch (data->modifier) {
     case TYPE_MOD_SIGNED:
     case TYPE_MOD_UNSIGNED:
-        if (!_parser_is_integer(parser))
+        if (!_parser_data_is_integer(data))
             goto invalid_combination;
         break;
     case TYPE_MOD_COMPLEX:
-        if (!_parser_is_floating(parser)) invalid_combination: {
+        if (!_parser_data_is_floating(data)) invalid_combination: {
             printfln("ERROR: '%s' cannot be used with '%s'",
-                TYPE_MOD_STRINGS[parser->data->modifier].data,
-                TYPE_BASE_STRINGS[parser->data->basic].data);
+                TYPE_MOD_STRINGS[data->modifier].data,
+                TYPE_BASE_STRINGS[data->base].data);
             _parser_throw_error(parser, TYPE_PARSE_INVALID);
             return;
         }
@@ -178,11 +179,11 @@ _parser_check(Type_Parser *parser)
         break;
     }
 
-    if (_parser_has_qualifier(parser, TYPE_QUAL_RESTRICT)) {
-        if (!_parser_is_pointer(parser)) {
+    if (_parser_data_has_qualifier(data, TYPE_QUAL_RESTRICT)) {
+        if (!_parser_data_is_pointer(data)) {
             printfln("ERROR: '%s' cannot be used with '%s'",
                 TYPE_QUAL_STRINGS[TYPE_QUAL_RESTRICT].data,
-                TYPE_BASE_STRINGS[parser->data->basic].data);
+                TYPE_BASE_STRINGS[data->base].data);
             _parser_throw_error(parser, TYPE_PARSE_INVALID);
             return;
         }
@@ -191,129 +192,132 @@ _parser_check(Type_Parser *parser)
 }
 
 static void
-_parser_finalize(Type_Parser *parser, bool final)
+_parser_finalize(Type_Parser *parser, Type_Parser_Data *data, bool is_pointee)
 {
     // Map default types for lone modifiers.
-    if (parser->data->basic == TYPE_BASE_NONE) {
-        switch (parser->data->modifier) {
+    if (data->base == TYPE_BASE_NONE) {
+        switch (data->modifier) {
         // `signed` maps to `signed int` which in turn maps to `int`.
         case TYPE_MOD_SIGNED:
         // `unsigned` maps to `unsigned int`.
         case TYPE_MOD_UNSIGNED:
-            parser->data->basic = TYPE_BASE_INT;
+            data->base = TYPE_BASE_INT;
             break;
 
         // `complex` maps to `complex double`.
         case TYPE_MOD_COMPLEX:
-            parser->data->basic = TYPE_BASE_DOUBLE;
+            data->base = TYPE_BASE_DOUBLE;
             break;
 
         default:
-            if (final) {
+            // Only throw errors for the innermost recursive call.
+            if (!is_pointee) {
                 println("ERROR: No basic type nor modifier were received.");
                 _parser_throw_error(parser, TYPE_PARSE_INVALID);
             }
-            return;
+            break;
         }
     }
 
     // Ensure all the integer types (sans `char`) are signed when not specified.
-    switch (parser->data->basic) {
+    switch (data->base) {
     case TYPE_BASE_SHORT:
     case TYPE_BASE_INT:
     case TYPE_BASE_LONG:
     case TYPE_BASE_LONG_LONG:
-        if (parser->data->modifier == TYPE_MOD_NONE)
-            parser->data->modifier = TYPE_MOD_SIGNED;
+        if (data->modifier == TYPE_MOD_NONE)
+            data->modifier = TYPE_MOD_SIGNED;
         break;
 
     default:
         break;
     }
-    _parser_check(parser);
+    _parser_check(parser, data);
 }
 
 static void
-_parser_write_qualifier(const Type_Parser *parser, String_Builder *builder, Type_Qualifier qualifier)
-{
-    if (parser->data->qualifiers & BIT(qualifier)) {
+_parser_write_qualifier(const Type_Parser_Data *data, String_Builder *builder, Type_Qualifier qualifier)
+    {
+        if (data->qualifiers & BIT(qualifier)) {
         string_append_string(builder, TYPE_QUAL_STRINGS[qualifier]);
         string_append_char(builder, ' ');
     }
 }
 
 static void
-_parser_try_write_qualifiers(const Type_Parser *parser, String_Builder *builder)
+_parser_try_write_qualifiers(const Type_Parser_Data *data, String_Builder *builder)
 {
-    _parser_write_qualifier(parser, builder, TYPE_QUAL_CONST);
-    _parser_write_qualifier(parser, builder, TYPE_QUAL_VOLATILE);
-    _parser_write_qualifier(parser, builder, TYPE_QUAL_RESTRICT);
+    _parser_write_qualifier(data, builder, TYPE_QUAL_CONST);
+    _parser_write_qualifier(data, builder, TYPE_QUAL_VOLATILE);
+    _parser_write_qualifier(data, builder, TYPE_QUAL_RESTRICT);
 }
 
 static void
-_parser_write(Type_Parser *parser)
+_parser_write(const Type_Parser_Data *data)
 {
     // We will only do this for up to the first pointer. E.g. given `int *const`,
     // we will first build the string `int *`.
     char buf[256];
     String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
 
-    if (parser->data->pointee != NULL) {
-        // hack because we keep so much state
-        Type_Parser_Data *prev = parser->data;
-        parser->data = parser->data->pointee;
-        _parser_write(parser);
-        parser->data = prev;
+    if (data->pointee != NULL) {
+        _parser_write(data->pointee);
     }
 
-    if (!_parser_is_pointer(parser))
-        _parser_try_write_qualifiers(parser, &builder);
+    if (!_parser_data_is_pointer(data))
+        _parser_try_write_qualifiers(data, &builder);
 
-    switch (parser->data->modifier) {
+    switch (data->modifier) {
     case TYPE_MOD_NONE: write_type_only:
-        string_append_string(&builder, TYPE_BASE_STRINGS[parser->data->basic]);
+        string_append_string(&builder, TYPE_BASE_STRINGS[data->base]);
         break;
     case TYPE_MOD_SIGNED:
-        if (parser->data->basic != TYPE_BASE_CHAR)
+        if (data->base != TYPE_BASE_CHAR)
             goto write_type_only;
         // Fallthrough
     case TYPE_MOD_UNSIGNED:
     case TYPE_MOD_COMPLEX:
-        string_append_string(&builder, TYPE_MOD_STRINGS[parser->data->modifier]);
+        string_append_string(&builder, TYPE_MOD_STRINGS[data->modifier]);
         string_append_char(&builder, ' ');
-        string_append_string(&builder, TYPE_BASE_STRINGS[parser->data->basic]);
+        string_append_string(&builder, TYPE_BASE_STRINGS[data->base]);
         break;
     default:
         break;
     }
 
-    if (_parser_is_pointer(parser)) {
+    if (_parser_data_is_pointer(data)) {
         string_append_cstring(&builder, " *");
-        _parser_try_write_qualifiers(parser, &builder);
+        _parser_try_write_qualifiers(data, &builder);
     }
 
-    printf("%s", string_to_cstring(&builder));
+    print(string_to_cstring(&builder));
 }
 
 void
 type_parser_parse(Type_Parser *parser, String *state, int recurse)
 {
     Type_Token token;
-    
+    int        steps = 1;
+
 loop_start:
     // Ugly to use goto like this but it works for our purposes...
     token = type_lexer_scan(&parser->lexer);
     parser->consumed = token;
+    for (int i = 0; i < recurse; ++i) {
+        fputc('\t', stdout);
+    }
+    printf("[%i] ", steps++);
+
     switch (token.type) {
     // Integer
-    case TYPE_TOKEN_CHAR:   _parser_set_basic(parser, token, TYPE_BASE_CHAR);   break;
-    case TYPE_TOKEN_SHORT:  _parser_set_basic(parser, token, TYPE_BASE_SHORT);  break;
-    case TYPE_TOKEN_INT:    _parser_set_basic(parser, token, TYPE_BASE_INT);    break;
-    case TYPE_TOKEN_LONG:   _parser_set_basic(parser, token, TYPE_BASE_LONG);   break;
+    case TYPE_TOKEN_CHAR:   _parser_set_base(parser, token, TYPE_BASE_CHAR);    break;
+    case TYPE_TOKEN_SHORT:  _parser_set_base(parser, token, TYPE_BASE_SHORT);   break;
+    case TYPE_TOKEN_INT:    _parser_set_base(parser, token, TYPE_BASE_INT);     break;
+    case TYPE_TOKEN_LONG:   _parser_set_base(parser, token, TYPE_BASE_LONG);    break;
 
     // Float
-    case TYPE_TOKEN_FLOAT:  _parser_set_basic(parser, token, TYPE_BASE_FLOAT);  break;
-    case TYPE_TOKEN_DOUBLE: _parser_set_basic(parser, token, TYPE_BASE_DOUBLE); break;
+    case TYPE_TOKEN_FLOAT:  _parser_set_base(parser, token, TYPE_BASE_FLOAT);   break;
+    case TYPE_TOKEN_DOUBLE: _parser_set_base(parser, token, TYPE_BASE_DOUBLE);  break;
 
     // User-defined
     case TYPE_TOKEN_STRUCT:
@@ -334,37 +338,46 @@ loop_start:
     case TYPE_TOKEN_RESTRICT:   _parser_set_qualifier(parser, TYPE_QUAL_RESTRICT); break;
         break;
 
-    case TYPE_TOKEN_VOID:       _parser_set_basic(parser, token, TYPE_BASE_VOID); break;
+    case TYPE_TOKEN_VOID:       _parser_set_base(parser, token, TYPE_BASE_VOID); break;
     case TYPE_TOKEN_ASTERISK: {
         Type_Parser_Data pointer = {
             .pointee    = parser->data,
-            .basic      = TYPE_BASE_POINTER,
+            .base       = TYPE_BASE_POINTER,
             .modifier   = TYPE_MOD_NONE,
             .qualifiers = 0,
         };
-        // We use `parser->data` outside of function calls, hence the reset.
         parser->data = &pointer;
+        // WARNING: If we throw an error at any point, `parser->data` will likely
+        // be a dangling pointer at the outermost caller's location!
+        _parser_finalize(parser, pointer.pointee, true);
+        
+        print("Pointer to: '");
+        _parser_write(pointer.pointee);
+        println("'");
+
+        // We use `parser->data` outside of function calls, hence the reset.
         type_parser_parse(parser, state, recurse + 1);
         parser->data = pointer.pointee;
         
-        // Return, don't break as we don't want to print the lone pointee.
+        // Return, don't break as we don't want to print/check the lone pointee.
         return;
     }
     case TYPE_TOKEN_EOF:
         break;
     case TYPE_TOKEN_UNKNOWN:
+        printfln("[ERROR]: Unknown token " STRING_QFMTSPEC, string_fmtarg(token.word));
         _parser_throw_error(parser, TYPE_PARSE_UNKNOWN);
         break;
 
     default:
-        __builtin_assume(false);
+        assert(false);
     }
     
     if (token.type != TYPE_TOKEN_EOF)
         goto loop_start;
 
-    _parser_finalize(parser, false);
+    _parser_finalize(parser, parser->data, false);
     printf("Final Type: '");
-    _parser_write(parser);
+    _parser_write(parser->data);
     println("'");
 }

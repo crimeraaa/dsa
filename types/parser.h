@@ -7,7 +7,7 @@
 
 typedef enum {
     TYPE_PARSE_NONE,
-    TYPE_PARSE_UNKNOWN, // The word we parsed is not a basic type nor a modifier.
+    TYPE_PARSE_UNKNOWN, // The word we parsed is not a base type nor a modifier.
     TYPE_PARSE_INVALID, // The resulting type doesn't make sense, e.g. `long float`, `short char`.
     TYPE_PARSE_COUNT,
 } Type_Parse_Error;
@@ -20,7 +20,7 @@ typedef struct {
 typedef struct Type_Parser_Data Type_Parser_Data;
 struct Type_Parser_Data {
     Type_Parser_Data    *pointee;
-    Type_Base            basic;
+    Type_Base            base;
     Type_Modifier        modifier;
     Type_Qualifier_Set   qualifiers;
 };

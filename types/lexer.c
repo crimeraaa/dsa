@@ -13,7 +13,7 @@ type_lexer_make(const char *text, size_t len)
 }
 
 static char
-peek(Type_Lexer *lexer)
+peek(const Type_Lexer *lexer)
 {
     return *lexer->current;
 }
@@ -28,8 +28,7 @@ static void
 skip_whitespace(Type_Lexer *lexer)
 {
     for (;;) {
-        char ch = *lexer->current;
-        if (ascii_is_whitespace(ch)) {
+        if (ascii_is_whitespace(peek(lexer))) {
             advance(lexer);
             continue;
         }
@@ -38,11 +37,11 @@ skip_whitespace(Type_Lexer *lexer)
 }
 
 static Type_Token
-make_token(Type_Lexer *lexer, Type_Token_Type type)
+make_token(const Type_Lexer *lexer, Type_Token_Type type)
 {
     Type_Token token = {
         .type = type,
-        .word = {lexer->start, cast(size_t)(lexer->current - lexer->start)},
+        .word = {.data = lexer->start, .len = cast(size_t)(lexer->current - lexer->start)},
     };
     return token;
 }
@@ -84,8 +83,10 @@ TYPE_TOKEN_STRINGS[TYPE_TOKEN_COUNT] = {
     [TYPE_TOKEN_UNKNOWN]    = lit("<unknown>"),
 };
 
+#undef lit
+
 static Type_Token
-set_reserved_or_ident(Type_Lexer *lexer, String word, Type_Token_Type type)
+set_reserved_or_ident(const Type_Lexer *lexer, String word, Type_Token_Type type)
 {
     if (string_eq(word, TYPE_TOKEN_STRINGS[type])) {
         return make_token(lexer, type);
@@ -94,7 +95,7 @@ set_reserved_or_ident(Type_Lexer *lexer, String word, Type_Token_Type type)
 }
 
 static Type_Token
-make_reserved_or_ident(Type_Lexer *lexer)
+make_reserved_or_ident(const Type_Lexer *lexer)
 {
     String word = {lexer->start, cast(size_t)(lexer->current - lexer->start)};
     switch (word.data[0]) {
