@@ -294,7 +294,7 @@ _parser_write(const Type_Parser_Data *data)
 }
 
 void
-type_parser_parse(Type_Parser *parser, String *state, int recurse)
+type_parser_parse(Type_Parser *parser, int recurse)
 {
     Type_Token token;
     int        steps = 1;
@@ -302,7 +302,6 @@ type_parser_parse(Type_Parser *parser, String *state, int recurse)
 loop_start:
     // Ugly to use goto like this but it works for our purposes...
     token = type_lexer_scan(&parser->lexer);
-    parser->consumed = token;
     for (int i = 0; i < recurse; ++i) {
         fputc('\t', stdout);
     }

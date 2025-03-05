@@ -30,11 +30,10 @@ typedef struct Type_Parser Type_Parser;
 struct Type_Parser {
     Allocator           allocator;
     Type_Lexer          lexer;
-    Type_Token          consumed;
     Type_Table         *table;
     Error_Handler      *handler;
     Type_Parser_Data   *data;
 };
 
 void
-type_parser_parse(Type_Parser *parser, String *state, int recurse);
+type_parser_parse(Type_Parser *parser, int recurse);

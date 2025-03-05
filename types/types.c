@@ -58,7 +58,6 @@ type_parse_string(Type_Table *table, const char *text, size_t len, Allocator all
     Type_Parser parser = {
         .allocator  = allocator,
         .lexer      = type_lexer_make(text, len),
-        .consumed   = {0},
         .handler    = &handler,
         .table      = table,
         .data       = data,
@@ -66,8 +65,7 @@ type_parse_string(Type_Table *table, const char *text, size_t len, Allocator all
     
     handler.error = TYPE_PARSE_NONE;
     if (setjmp(handler.caller) == 0) {
-        String state = {text, len};
-        type_parser_parse(&parser, &state, 1);
+        type_parser_parse(&parser, 1);
         return true;
     } else {
         return false;
