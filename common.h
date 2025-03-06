@@ -1,5 +1,22 @@
 #pragma once
 
+/**=============================================================================
+ * We need to define `_DEFAULT_SOURCE` here because of our header-only nature.
+ *
+ *      This also means that for `arena.h` to work, you MUST include *this* file
+ *      (or include a file that includes this one) BEFORE any standard headers.
+ * 
+ *      `_DEFAULT_SOURCE` is used so that `sys/mman.h` will define `MAP_ANONYMOUS`,
+ *      There is probably a better way of enabling it...
+ *=============================================================================*/
+#ifdef __unix__
+
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif // _DEFAULT_SOURCE
+
+#endif // __unix__
+
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>

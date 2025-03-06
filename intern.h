@@ -24,23 +24,46 @@ typedef struct {
     char     data[];
 } Intern_String;
 
+/**
+ * @brief
+ *      Create a new stack-allocated `Intern` instance with the given allocator.
+ * 
+ * @note
+ *      Does not allocate anything by default thus no `Allocator_Error` is returned
+ *      in any way.
+ */
 Intern
 intern_make(Allocator allocator);
 
+/**
+ * @brief
+ *      Deallocates all the memory associated with `intern`.
+ */
 void
 intern_destroy(Intern *intern);
 
 /**
- * @note
- *      If `string` is not yet interned, we will intern it.
+ * @brief
+ *      Get a view into the interned representation of `text`. If it is not yet
+ *      yet interned, we will intern it then.
  *
  * @return
- *      A `String` instance which points to the interned string.
+ *      A `String` instance which points to the underlying `Intern_String`.
  *      This string is valid as long as the map lives.
  */
 String
-intern_get(Intern *intern, String string);
+intern_get(Intern *intern, String text);
 
+/**
+ * @brief
+ *      Get a nul-terminated (C-style) string from the interned representation
+ *      of `text`. If it is not yet interned, we will intern it then.
+ *      
+ * @note
+ *      No new allocations are made as `Intern_String` is implementation to
+ *      always be nul-terminated. Thus, you cannot (and SHOULD not) free the
+ *      pointer returned from this function.
+ */
 const char *
 intern_get_cstring(Intern *intern, String text);
 

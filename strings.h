@@ -3,12 +3,52 @@
 #include "common.h"
 #include "mem/allocator.h"
 
-typedef struct {
+/**
+ * @brief
+ *      A read-only view into some contiguous sequence of characters.
+ *
+ *      This is mainly useful to get substrings out of C-style strings
+ *      (nul-terminated, `const char *`) or other `String` instances without
+ *      dynamically allocating anything.
+ *      
+ *      This is also useful to store the length right next to the pointer so that
+ *      one does not need to constantly call `strlen`.
+ * 
+ * @note
+ *      For compatibility with standard library functions, `len` is unsigned.
+ *      However if I had it my way I would definitely go with signed so we can
+ *      also signal errors using negative values.
+ */
+typedef struct String String;
+struct String {
     const char *data;
     size_t      len;
-} String;
+};
 
 /**
+ * @brief
+ *      Utility macro to iterate over `string` on a character-by-character basis.
+ *      Intended to be similar to:
+ * 
+ * C++:
+ * ```c++
+ * std::string_view s;
+ * for (auto c : s) { ... } 
+ * ```
+ *
+ * Python:
+ * ```py
+ * s: str
+ * for c in s:
+ *      ...
+ * ```
+ *      
+ * @param name
+ *      The identifier to use for the iterator.
+ *
+ * @param string
+ *      The `String` we will iterate over.
+ *
  * @details
  *      The `_first_` nonsense is to allow us to create a for loop that runs
  *      exactly only once.
@@ -27,6 +67,30 @@ for (const char *_ptr_ = (string).data, *const _end_ = _ptr_ + (string).len;   \
     ++_ptr_)                                                                   \
     for (char name = *_ptr_, _first_ = 1; _first_; _first_ = 0)
 
+/**
+ * @brief
+ *      Utility macro to iterate over `string` on a per-index basis.
+ *      Intended to be similar to:
+ *
+ * C++:
+ * ```c++
+ * std::string_view s;
+ * for (auto [_, i]: s) { ... }
+ * ```
+ *
+ * Python:
+ * ```py
+ * s: str
+ * for i in range(len(str)):
+ *      ...
+ * ```
+ *      
+ * @param idx
+ *      The identifier to use for the index iterator.
+ *      
+ * @param string
+ *      The `String` we will iterate over.
+ */
 #define string_for_eachi(idx, string) \
 for (size_t idx = 0, _end_ = (string).len; idx < _end_; ++idx)
 
@@ -44,16 +108,45 @@ for (size_t idx = 0, _end_ = (string).len; idx < _end_; ++idx)
 // Assumes you'll never have a string this big!
 #define STRING_NOT_FOUND    ((size_t)-1)
 
+/**
+ * @brief
+ *      Determine if `a` and `b` have the same sequence of characters.
+ */
 bool
 string_eq(String a, String b);
 
+/**
+ * @brief
+ *      Wrap the given nul-terminated C-style string `cstring` in a `String`
+ *      instance.
+ * 
+ *      This is useful to interface with the other `string_*` functions.
+ */
 String
 string_from_cstring(const char *cstring);
 
+/**
+ * @brief
+ *      Get a substring of `string` based on the given indices.
+ *
+ * @param start
+ *      Inclusive start index.
+ *
+ * @param stop
+ *      Exclusive stop index.
+ *
+ * @note
+ *      We do not support negative indices to refer to a relative offset from
+ *      end of the string as in Python. E.g. `s[:-1]`.
+ */
 String
 string_slice(String string, size_t start, size_t stop);
 
-// Returns a slice of `text` that does not include any whitespace to either side.
+/**
+ * @brief
+ *      Create a `String` which is a slice of `text` that does not include any
+ *      whitespace to either side.
+ */
 String
 string_trim_space(String text);
 
@@ -159,6 +252,17 @@ _Generic((charset),                                                            \
 
 // STRING BUILDER ---------------------------------------------------------- {{{
 
+/**
+ * @brief
+ *      A dynamic (growable) array of `char`.
+ *
+ * @note
+ *      Must be guaranteed to be nul terminated. Poking at `buffer` directly,
+ *      while discouraged, does result in valid nul-terminated C-style strings.
+ *      
+ *      Instead of poking at `buffer` please use the `string_to_string()` and
+ *      `string_to_cstring()` functions.
+ */
 typedef struct {
     Allocator allocator;
     char     *buffer;
@@ -166,18 +270,77 @@ typedef struct {
     size_t    cap;
 } String_Builder;
 
+/**
+ * @brief
+ *      Creates a stack-allocated `String_Builder` which also contains the given
+ *      `allocator`. E.g:
+ * ```
+ * String_Builder builder = string_builder_make(GLOBAL_HEAP_ALLOCATOR);
+ * ```
+ *
+ * @note
+ *      This function does not allocate anything by itself. Thus, no
+ *      `Allocator_Error` can occur.
+ */
 String_Builder
 string_builder_make(Allocator allocator);
 
+/**
+ * @brief
+ *      Create a stack-allocated `String_Builder` instance containing the given
+ *      fixed-size `buffer` of size `cap`. E.g:
+ *      
+ * ```c
+ * char buf[512];
+ * String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
+ * ```
+ * 
+ * @note
+ *      The resulting `String_Builder` will contain `GLOBAL_NONE_ALLOCATOR` as
+ *      its buffer cannot be resized nor freed. It is used mainly to provide a
+ *      valid `Allocator` interface.
+ */
 String_Builder
 string_builder_make_fixed(char *buffer, size_t cap);
 
+/**
+ * @brief
+ *      Deallocates the dynamic memory associated with `builder`. The contained
+ *      `allocator` will be responsible for handling said memory.
+ *
+ * @note
+ *      This is valid to call even when `builder` came from `string_builder_make_fixed()`.
+ *      In such case, the `GLOBAL_NONE_ALLOCATOR` will simply do nothing.
+ */
 void
 string_builder_destroy(String_Builder *builder);
 
+/**
+ * @brief
+ *      Get the current length (that is, the number of active characters) in
+ *      the builder.
+ */
 size_t
 string_builder_len(String_Builder *builder);
 
+/**
+ * @brief
+ *      Resets the builder's length counter but does not free the underlying
+ *      memory. This allows you to reuse the builder.
+ *
+ * @note
+ *      If you have strings/pointers that came from `string_to_[c]string()`,
+ *      they will still point to the same memory!
+ *
+ * ```c
+ * String_Builder builder = ...;
+ * string_append_cstring(&builder, "Hi mom!");
+ * const char *s = string_to_cstring(&builder); // "Hi mom!""
+ * string_builder_reset(&builder);
+ * string_append_cstring(&builder, "Hello");
+ * printf("%s\n", s); // "Hello", not "Hi mom!"
+ * ```
+ */
 void
 string_builder_reset(String_Builder *builder);
 
