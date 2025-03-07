@@ -43,7 +43,7 @@ void
 string_builder_reset(String_Builder *builder)
 {
     // This is necessary to ensure future writes are nul-terminated.
-    memset(&builder->buffer[0], 0, builder->len);
+    memset(&builder->buffer[0], 0, builder->cap);
     builder->len = 0;
 }
 

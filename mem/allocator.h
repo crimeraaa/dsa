@@ -36,7 +36,7 @@ typedef enum Allocator_Error Allocator_Error;
  *      what guarantees must be made by any allocator that chooses to implement
  *      this interface.
  *      
- *      Useful examples are `GLOBAL_HEAP_ALLOCATOR` for simple wrappers and
+ *      Useful examples are `GLOBAL_HEAP_ALLOCATOR` for simply wrappers and
  *      `Arena` from `mem/arena.h` for more involved wrappers.
  */
 typedef struct Allocator Allocator;
@@ -99,7 +99,7 @@ mem_rawnew(Allocator_Error *out_error, size_t size, size_t align, Allocator allo
  *      Low-level memory reallocation function for the `Allocator` interface.
  *      
  *      Unlike `mem_rawnew`, and thus the helper macros `mem_new` and `mem_make`,
- *      this function may return a unique pointer every time. Some allocators
+ *      this function may not return a unique pointer every time. Some allocators
  *      may be able to 'extend' the allocation pointed to by `old_ptr`.
  *      
  *      Also, if `old_size` is actually greater than `new_size`, it is possible
@@ -145,6 +145,11 @@ mem_rawfree(void *ptr, size_t size, Allocator allocator);
  *      Low-level memory deallocation function for the `Allocator` interfaces
  *      for allocators which support freeing all their owned memory at once,
  *      such as arena allocators.
+ *
+ * @note
+ *      For allocators that do not support this operation (e.g. heap allocators)
+ *      simple make the callback function write `ALLOCATOR_ERROR_MODE_NOT_IMPLEMENTED`
+ *      to the `Allocator_Error` out-parameter.
  */
 Allocator_Error
 mem_free_all(Allocator allocator);

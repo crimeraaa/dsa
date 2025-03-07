@@ -72,12 +72,6 @@ for (const char *_ptr_ = (string).data, *const _end_ = _ptr_ + (string).len;   \
  *      Utility macro to iterate over `string` on a per-index basis.
  *      Intended to be similar to:
  *
- * C++:
- * ```c++
- * std::string_view s;
- * for (auto [_, i]: s) { ... }
- * ```
- *
  * Python:
  * ```py
  * s: str

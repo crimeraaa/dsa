@@ -173,7 +173,7 @@ static inline Memory_Block *
 _arena_memory_block_new(size_t size, Memory_Block *prev)
 {
     Memory_Block *block = cast(Memory_Block *)mmap(
-        /* addr   */ prev,
+        /* addr   */ NULL,
         /* len    */ size,
         /* prot   */ PROT_READ | PROT_WRITE,
         /* flags  */ MAP_ANONYMOUS | MAP_PRIVATE,
@@ -351,7 +351,7 @@ static void *
 _arena_chain_new_block_and_alloc(Arena *arena, size_t size, size_t align)
 {
     // TODO: Ensure this is a power of 2?
-    const size_t  block_size = _arena_max(size, ARENA_PAGE_SIZE);
+    const size_t  block_size = _arena_max(size + sizeof(Memory_Block), ARENA_PAGE_SIZE);
     Memory_Block *new_block  = _arena_memory_block_new(block_size, arena->begin);
     if (new_block == NULL)
         return NULL;

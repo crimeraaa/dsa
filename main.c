@@ -1,15 +1,14 @@
 /// local
 #define ARENA_IMPLEMENTATION
 #define ALLOCATOR_IMPLEMENTATION
-#include "mem/allocator.h"
-#include "mem/arena.h"
-
 #define ASCII_IMPLEMENTATION
 #define STRINGS_IMPLEMENTATION
 #define STRINGS_BUILDER_IMPLEMENTATION
-#include "strings.h"
-
 #define INTERN_IMPLEMENTATION
+
+#include "mem/allocator.h"
+#include "mem/arena.h"
+#include "strings.h"
 #include "intern.h"
 
 #include "types/types.h"
@@ -36,7 +35,7 @@ run_interactive(Type_Table *table, Arena *arena)
         if (!type_parse_string(table, buf, len, temp_allocator)) {
             printfln("Invalid type '%s'.", buf);
         }
-
+        
         size_t total;
         size_t used  = arena_get_usage(arena, &total);
         printfln(
@@ -76,7 +75,7 @@ main(void)
         void **p = arena_rawalloc(&arena, sizeof(void *), alignof(void *));
         *p = ch;
         printfln("void **p: %p; *p = %p\n", cast(void *)p, *p);
-        
+
         arena_free_all(&arena);
     }
 
