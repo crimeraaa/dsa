@@ -5,6 +5,7 @@
 #pragma once
 
 #include "../strings.h"
+#include "../intern.h"
 
 /**
  * @brief
@@ -15,173 +16,210 @@
  * @link
  *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L5
  */
-enum Type_BasicKind {
-    Type_BasicKind_Invalid,
-    Type_BasicKind_Bool,                // `_Bool` (C99-C17), `bool` (C23)
+enum CType_BasicKind {
+    CType_BasicKind_Invalid,
+    CType_BasicKind_Bool,               // `_Bool` (C99-C17), `bool` (C23)
 
     // Integer Types
-    Type_BasicKind_Char,                // `char` - distinct from signed/unsigned versions
-    Type_BasicKind_Signed_Char,         // `signed char`, `char signed`
-    Type_BasicKind_Short,               // `short`, `short int`, `int short` and signed versions thereof
-    Type_BasicKind_Int,                 // `int`, `signed int`, `int signed`, `signed`
-    Type_BasicKind_Long,                // `long`, `long int`, `int long` and signed versions thereof
-    Type_BasicKind_Long_Long,           // `long long`, `long long int`, `int long long`, `long int long` and signed versions thereof
-    Type_BasicKind_Unsigned_Char,       // `unsigned char`
-    Type_BasicKind_Unsigned_Short,      // `unsigned short`, `short unsigned`, `unsigned short int`, `unsigned int short`
-    Type_BasicKind_Unsigned_Int,        // `unsigned int`, `int unsigned`, `unsigned`
-    Type_BasicKind_Unsigned_Long,       // `unsigned long`, `long unsigned`, `unsigned long int`, `long int unsigned`
-    Type_BasicKind_Unsigned_Long_Long,  // `unsigned long long`, `long long unsigned`, `unsigned long long int`, `unsigned int long long`, ...
+    CType_BasicKind_Char,               // `char` - distinct from signed/unsigned versions
+    CType_BasicKind_Signed_Char,        // `signed char`, `char signed`
+    CType_BasicKind_Short,              // `short`, `short int`, `int short` and signed versions thereof
+    CType_BasicKind_Int,                // `int`, `signed int`, `int signed`, `signed`
+    CType_BasicKind_Long,               // `long`, `long int`, `int long` and signed versions thereof
+    CType_BasicKind_Long_Long,          // `long long`, `long long int`, `int long long`, `long int long` and signed versions thereof
+    CType_BasicKind_Unsigned_Char,      // `unsigned char`
+    CType_BasicKind_Unsigned_Short,     // `unsigned short`, `short unsigned`, `unsigned short int`, `unsigned int short`
+    CType_BasicKind_Unsigned_Int,       // `unsigned int`, `int unsigned`, `unsigned`
+    CType_BasicKind_Unsigned_Long,      // `unsigned long`, `long unsigned`, `unsigned long int`, `long int unsigned`
+    CType_BasicKind_Unsigned_Long_Long, // `unsigned long long`, `long long unsigned`, `unsigned long long int`, `unsigned int long long`, ...
 
     // Floating-Point Types
     // NOTE: `_Complex` and `complex` are interchangeable.
     // NOTE: `_Imaginary` and `imaginary` are optional! Nobody really implements it.
-    Type_BasicKind_Float,               // `float`
-    Type_BasicKind_Double,              // `double`
-    Type_BasicKind_Long_Double,         // `long double`, `double long`
-    Type_BasicKind_Complex_Float,       // `complex float`, `float complex`
-    Type_BasicKind_Complex_Double,      // `complex double`, `double complex`, `complex`
-    Type_BasicKind_Complex_Long_Double, // `complex long double`, `complex double long`, `long complex double`, `long double complex`, `long complex`, `complex long`
+    CType_BasicKind_Float,              // `float`
+    CType_BasicKind_Double,             // `double`
+    CType_BasicKind_Long_Double,        // `long double`, `double long`
+    CType_BasicKind_Complex_Float,      // `complex float`, `float complex`
+    CType_BasicKind_Complex_Double,     // `complex double`, `double complex`, `complex`
+    CType_BasicKind_Complex_Long_Double,// `complex long double`, `complex double long`, `long complex double`, `long double complex`, `long complex`, `complex long`
 
     // Misc.
-    Type_BasicKind_Void,                // `void`
-    Type_BasicKind_Count,
+    CType_BasicKind_Void,               // `void`
+    CType_BasicKind_Count,
 };
-typedef enum Type_BasicKind Type_BasicKind;
+typedef enum CType_BasicKind CType_BasicKind;
 
 /**
  * @brief
- *      Tells us how to interpret a `Type`. Notice how pointers, structs, enums
+ *      Tells us how to interpret a `CType`. Notice how pointers, structs, enums
  *      and unions are finally present.
  *
  * @link
  *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L296
  */
-enum Type_Kind {
-    Type_Kind_Invalid,
-    Type_Kind_Basic,
-    Type_Kind_Pointer,
-    Type_Kind_Struct,
-    Type_Kind_Enum,
-    Type_Kind_Union,
-    Type_Kind_Count,
+enum CType_Kind {
+    CType_Kind_Invalid,
+    CType_Kind_Basic,
+    CType_Kind_Pointer,
+    CType_Kind_Struct,
+    CType_Kind_Enum,
+    CType_Kind_Union,
+    CType_Kind_Count,
 };
-typedef enum Type_Kind Type_Kind;
+typedef enum CType_Kind CType_Kind;
 
 extern const String
-TYPE_KIND_STRINGS[Type_Kind_Count];
+ctype_kind_strings[CType_Kind_Count];
 
-typedef struct Type Type;
+typedef struct CType CType;
 
 #ifndef BIT
 #define BIT(N) (1 << (N))
 #endif // BIT
 
-enum Type_BasicFlag {
-    Type_BasicFlag_Bool        = BIT(0), // `_Bool`, `bool`
-    Type_BasicFlag_Integer     = BIT(1), // `char`, `short`, `int`, `long`, `long long` and variants thereof.
-    Type_BasicFlag_Float       = BIT(2), // `float`, `double`, `long double` and variants thereof.
-    Type_BasicFlag_Literal     = BIT(3), // untyped, possible freely convertible: integer literals, float literals, etc.
+enum CType_BasicFlag {
+    CType_BasicFlag_Bool        = BIT(0),   // `_Bool`, `bool`
+    CType_BasicFlag_Integer     = BIT(1),   // `char`, `short`, `int`, `long`, `long long` and variants thereof.
+    CType_BasicFlag_Float       = BIT(2),   // `float`, `double`, `long double` and variants thereof.
+    CType_BasicFlag_Literal     = BIT(3),   // untyped, possible freely convertible: integer literals, float literals, etc.
 
-    Type_BasicFlag_Signed      = Type_BasicFlag_Integer | BIT(4), // `char` is not guaranteed to be signed.
-    Type_BasicFlag_Unsigned    = Type_BasicFlag_Integer | BIT(5), // `char` is not guaranteed to be unsigned.
-    Type_BasicFlag_Complex     = Type_BasicFlag_Float   | BIT(6), // `complex` variants of the types under `Type_BasicFlag_Float`.
-    Type_BasicFlag_Numeric     = Type_BasicFlag_Integer | Type_BasicFlag_Signed | Type_BasicFlag_Unsigned | Type_BasicFlag_Float | Type_BasicFlag_Complex,
+    CType_BasicFlag_Signed      = BIT(4),   // `char` is not guaranteed to be signed.
+    CType_BasicFlag_Unsigned    = BIT(5),   // `char` is not guaranteed to be unsigned.
+    CType_BasicFlag_Complex     = BIT(6),   // `complex` variants of the types under `CType_BasicFlag_Float`.
+
+    CType_BasicFlag_Numeric     = CType_BasicFlag_Integer | CType_BasicFlag_Signed | CType_BasicFlag_Unsigned | CType_BasicFlag_Float | CType_BasicFlag_Complex,
 };
-typedef enum Type_BasicFlag Type_BasicFlag;
+typedef enum CType_BasicFlag CType_BasicFlag;
 
-#undef BIT
+enum CType_QualifierFlag {
+    CType_QualifierFlag_Const    = BIT(0),  // Applicable to ALL types.
+    CType_QualifierFlag_Volatile = BIT(1),  // Applicable to ALL types.
+    CType_QualifierFlag_Restrict = BIT(2),  // Only valid for pointers.
+};
+typedef enum CType_QualifierFlag CType_QualifierFlag;
 
-// https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L117
-typedef struct Type_Basic Type_Basic;
-struct Type_Basic {
-    Type_BasicKind kind;
-    uint32_t       flags;  // See `Type_BasicFlag`.
-    String         name;
+/**
+ * @brief
+ *      This represents concrete information about any type that exists in practice.
+ *      This is separate from `CType` because is contains the qualifiers.
+ *
+ * @note
+ *      It does allow for qualifiers like `const` and `volatile` because basic
+ *      types, pointers, and aggregate types can be augmented with these.
+ *
+ *      Depending on the exact situation, they may be interchangeable with their
+ *      base types or not.
+ */
+typedef struct CType_Info CType_Info;
+struct CType_Info {
+    const CType         *type;       // Multiple `CType_Info` can refer to the same `CType`.
+    CType_QualifierFlag  qualifiers; // Bit set of `CType_QualifierFlag`.
+    bool                 is_owner;   // `type` is dynamically-allocated and we own it?
 };
 
-// https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L218
-typedef struct Type_Pointer Type_Pointer;
-struct Type_Pointer {
-    Type *pointee;
+/**
+ * @brief
+ *      This represents the basic information for all the basic types. The basic
+ *      types simply consists of all the integers, floating-points and `void`.
+ *
+ * @note
+ *      Qualifiers like `const` or `volatile` are not present. They simply
+ *      augment existing types rather than create new types on their own.
+ *
+ *      Also, qualifiers can be applied to pointers as well as aggregate types
+ *      like `struct`, `union` and `enum`. So that is a problem for the more
+ *      general `CType_Info`.
+ *
+ * @link
+ *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L117
+ */
+typedef struct CType_Basic CType_Basic;
+struct CType_Basic {
+    CType_BasicKind kind;
+    CType_BasicFlag flags;  // Bitset of `CType_BasicFlag`.
+    String          name;
+};
+
+/**
+ * @brief
+ *      This represents information about any given pointer type. Notice how
+ *      we point to a `CType_Info` and not a `CType` because the type we point to
+ *      can be qualified.
+ *
+ * @link
+ *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L218
+ */
+typedef struct CType_Pointer CType_Pointer;
+struct CType_Pointer {
+    const CType_Info   *pointee;
+    CType_QualifierFlag qualifiers;
 };
 
 // https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L131
-typedef struct Type_Struct Type_Struct;
-struct Type_Struct {/* TODO */ int i;};
+typedef struct CType_Struct CType_Struct;
+struct CType_Struct {/* TODO */ int i;};
 
 // https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L244
-typedef struct Type_Enum Type_Enum;
-struct Type_Enum {/* TODO */ int i;};
+typedef struct CType_Enum CType_Enum;
+struct CType_Enum {/* TODO */ int i;};
 
 // https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L131
-typedef struct Type_Union Type_Union;
-struct Type_Union {/* TODO */ int i;};
+typedef struct CType_Union CType_Union;
+struct CType_Union {/* TODO */ int i;};
 
-// https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L321
-struct Type {
-    Type_Kind kind;
+/**
+ * @brief
+ *      This represents basic data about *any* type, including pointers and
+ *      aggregate types or user-defined types.
+ *
+ * @link
+ *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L321
+ */
+struct CType {
+    CType_Kind kind;
     union {
-        Type_Basic   basic;
-        Type_Pointer pointer;
-        Type_Struct  struct_;
-        Type_Enum    enum_;
-        Type_Union   union_;
+        CType_Basic   basic;
+        CType_Pointer pointer;
+        CType_Struct  struct_;
+        CType_Enum    enum_;
+        CType_Union   union_;
     };
 };
 
-extern const Type
-TYPE_BASIC_TYPES[Type_BasicKind_Count];
+extern const CType
+ctype_basic_types[CType_BasicKind_Count];
 
-#ifdef TYPES_IMPLEMENTATION
-
-// NOTE: Ensure the order matches `Type_Kind`!
-const String
-TYPE_KIND_STRINGS[Type_Kind_Count] = {
-    string_literal("Type_Kind_Invalid"),
-    string_literal("Type_Kind_Basic"),
-    string_literal("Type_Kind_Pointer"),
-    string_literal("Type_Kind_Struct"),
-    string_literal("Type_Kind_Enum"),
-    string_literal("Type_Kind_Union"),
+typedef struct CType_Entry CType_Entry;
+struct CType_Entry {
+    CType_Info *info; // Each is dynamically allocated so they can be shared.
 };
 
-// NOTE: Ensure the order matches `Type_BasicKind`!
-// TODO: Do we care about size?
-const Type
-TYPE_BASIC_TYPES[Type_BasicKind_Count] = {
-    // Type_Kind,       Type_Basic{.kind,                   .flags,                     .name}
-    {Type_Kind_Invalid, {{Type_BasicKind_Invalid,            0,                          string_literal("<invalid>")}}},
-
-    // Booleans, Characters
-    {Type_Kind_Basic,   {{Type_BasicKind_Bool,               Type_BasicFlag_Bool,        string_literal("bool")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Char,               Type_BasicFlag_Integer,     string_literal("char")}}},
-
-    // Signed Integers
-    {Type_Kind_Basic,   {{Type_BasicKind_Signed_Char,        Type_BasicFlag_Signed,      string_literal("signed char")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Short,              Type_BasicFlag_Signed,      string_literal("short")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Int,                Type_BasicFlag_Signed,      string_literal("int")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Long,               Type_BasicFlag_Signed,      string_literal("long")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Long_Long,          Type_BasicFlag_Signed,      string_literal("long long")}}},
-
-    // Unsigned Integers
-    {Type_Kind_Basic,   {{Type_BasicKind_Unsigned_Char,      Type_BasicFlag_Unsigned,    string_literal("unsigned char")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Unsigned_Short,     Type_BasicFlag_Unsigned,    string_literal("unsigned short")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Unsigned_Int,       Type_BasicFlag_Unsigned,    string_literal("unsigned int")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Unsigned_Long,      Type_BasicFlag_Unsigned,    string_literal("unsigned long")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Unsigned_Long_Long, Type_BasicFlag_Unsigned,    string_literal("unsigned long long")}}},
-
-    // Floating-Point Types
-    {Type_Kind_Basic,   {{Type_BasicKind_Float,              Type_BasicFlag_Float,       string_literal("float")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Double,             Type_BasicFlag_Float,       string_literal("double")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Long_Double,        Type_BasicFlag_Float,       string_literal("long double")}}},
-
-    // Complex Types
-    {Type_Kind_Basic,   {{Type_BasicKind_Float,              Type_BasicFlag_Complex,     string_literal("complex float")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Double,             Type_BasicFlag_Complex,     string_literal("complex double")}}},
-    {Type_Kind_Basic,   {{Type_BasicKind_Long_Double,        Type_BasicFlag_Complex,     string_literal("complex long double")}}},
-
-    // Misc. Types
-    {Type_Kind_Basic,   {{Type_BasicKind_Void,               0,                          string_literal("void")}}},
+/**
+ * @note
+ *      The indexes, 0 up to `CType_BasicKind_Count - 1`, must be of type
+ *      `CType_BasicKind`. They must be unqualified.
+ */
+typedef struct CType_Table CType_Table;
+struct CType_Table {
+    Allocator   allocator;
+    CType_Entry *entries;
+    size_t      len;
+    size_t      cap;
 };
 
-#endif // TYPES_IMPLEMENTATION
+Allocator_Error
+ctype_table_init(CType_Table *table, Allocator allocator);
+
+void
+ctype_table_destroy(CType_Table *table);
+
+const CType_Info *
+ctype_table_get_basic_unqual(CType_Table *table, CType_BasicKind kind);
+
+const CType_Info *
+ctype_table_get_basic_qual(CType_Table *table, CType_BasicKind kind, CType_QualifierFlag qualifiers);
+
+const CType_Info *
+ctype_table_add_basic_qual(CType_Table *table, CType_BasicKind kind, CType_QualifierFlag qualifiers);
+
+#undef BIT
