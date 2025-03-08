@@ -10,10 +10,10 @@
  *      This is mainly useful to get substrings out of C-style strings
  *      (nul-terminated, `const char *`) or other `String` instances without
  *      dynamically allocating anything.
- *      
+ *
  *      This is also useful to store the length right next to the pointer so that
  *      one does not need to constantly call `strlen`.
- * 
+ *
  * @note
  *      For compatibility with standard library functions, `len` is unsigned.
  *      However if I had it my way I would definitely go with signed so we can
@@ -29,11 +29,11 @@ struct String {
  * @brief
  *      Utility macro to iterate over `string` on a character-by-character basis.
  *      Intended to be similar to:
- * 
+ *
  * C++:
  * ```c++
  * std::string_view s;
- * for (auto c : s) { ... } 
+ * for (auto c : s) { ... }
  * ```
  *
  * Python:
@@ -42,7 +42,7 @@ struct String {
  * for c in s:
  *      ...
  * ```
- *      
+ *
  * @param name
  *      The identifier to use for the iterator.
  *
@@ -78,10 +78,10 @@ for (const char *_ptr_ = (string).data, *const _end_ = _ptr_ + (string).len;   \
  * for i in range(len(str)):
  *      ...
  * ```
- *      
+ *
  * @param idx
  *      The identifier to use for the index iterator.
- *      
+ *
  * @param string
  *      The `String` we will iterate over.
  */
@@ -113,7 +113,7 @@ string_eq(String a, String b);
  * @brief
  *      Wrap the given nul-terminated C-style string `cstring` in a `String`
  *      instance.
- * 
+ *
  *      This is useful to interface with the other `string_*` functions.
  */
 String
@@ -253,7 +253,7 @@ _Generic((charset),                                                            \
  * @note
  *      Must be guaranteed to be nul terminated. Poking at `buffer` directly,
  *      while discouraged, does result in valid nul-terminated C-style strings.
- *      
+ *
  *      Instead of poking at `buffer` please use the `string_to_string()` and
  *      `string_to_cstring()` functions.
  */
@@ -283,12 +283,12 @@ string_builder_make(Allocator allocator);
  * @brief
  *      Create a stack-allocated `String_Builder` instance containing the given
  *      fixed-size `buffer` of size `cap`. E.g:
- *      
+ *
  * ```c
  * char buf[512];
  * String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
  * ```
- * 
+ *
  * @note
  *      The resulting `String_Builder` will contain `GLOBAL_NONE_ALLOCATOR` as
  *      its buffer cannot be resized nor freed. It is used mainly to provide a

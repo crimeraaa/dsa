@@ -5,7 +5,7 @@
  *
  *      This also means that for `arena.h` to work, you MUST include *this* file
  *      (or include a file that includes this one) BEFORE any standard headers.
- * 
+ *
  *      `_DEFAULT_SOURCE` is used so that `sys/mman.h` will define `MAP_ANONYMOUS`,
  *      There is probably a better way of enabling it...
  *=============================================================================*/

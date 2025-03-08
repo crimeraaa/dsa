@@ -12,7 +12,7 @@ debug: main
 
 main: $(SOURCES) $(HEADERS)
 	$(CC) $(CC_FLAGS) -o $@ $(SOURCES)
-	
+
 .PHONY: test
 test:
 	clang++ -std=c++17 -Wall -Wextra -o test/a.out $(wildcard test/*.cpp)

@@ -35,7 +35,7 @@ main()
     print_typeid(char);
     print_typeid(const char *);
     print_typeid(struct Empty);
-    
+
     print_typeid(std::string);
 
     // print_typeid(struct { int x;}); // not allowed!

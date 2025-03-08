@@ -1,10 +1,12 @@
 #include "lexer.h"
 #include "../ascii.h"
 
-Type_Lexer
-type_lexer_make(const char *text, size_t len)
+#include <string.h>
+
+C_Lexer
+c_lexer_make(const char *text, size_t len)
 {
-    Type_Lexer lexer = {
+    C_Lexer lexer = {
         .start   = text,
         .current = text,
         .end     = text + len,
@@ -13,148 +15,162 @@ type_lexer_make(const char *text, size_t len)
 }
 
 static char
-peek(const Type_Lexer *lexer)
+_c_lexer_peek(const C_Lexer *lexer)
 {
     return *lexer->current;
 }
 
 static char
-advance(Type_Lexer *lexer)
+_c_lexer_advance(C_Lexer *lexer)
 {
     return *lexer->current++;
 }
 
 static void
-skip_whitespace(Type_Lexer *lexer)
+_c_lexer_skip_whitespace(C_Lexer *lexer)
 {
     for (;;) {
-        if (ascii_is_whitespace(peek(lexer))) {
-            advance(lexer);
+        if (ascii_is_whitespace(_c_lexer_peek(lexer))) {
+            _c_lexer_advance(lexer);
             continue;
         }
         break;
     }
 }
 
-static Type_Token
-make_token(const Type_Lexer *lexer, Type_Token_Type type)
+static C_Token
+_c_lexer_make_token(const C_Lexer *lexer, C_TokenType type)
 {
-    Type_Token token = {
-        .type = type,
-        .word = {.data = lexer->start, .len = cast(size_t)(lexer->current - lexer->start)},
-    };
+    String  word  = {lexer->start, cast(size_t)(lexer->current - lexer->start)};
+    C_Token token = {type, word};
     return token;
 }
 
-#define lit     string_literal
-
 const String
-TYPE_TOKEN_STRINGS[TYPE_TOKEN_COUNT] = {
+c_token_strings[C_TokenType_Count] = {
+    [C_TokenType_Invalid]   = string_literal("<invalid>"),
+    [C_TokenType_Bool]      = string_literal("bool"),
+
     // Integers (sans `long long`)
-    [TYPE_TOKEN_CHAR]       = lit("char"),
-    [TYPE_TOKEN_SHORT]      = lit("short"),
-    [TYPE_TOKEN_INT]        = lit("int"),
-    [TYPE_TOKEN_LONG]       = lit("long"),
-    
+    [C_TokenType_Char]      = string_literal("char"),
+    [C_TokenType_Short]     = string_literal("short"),
+    [C_TokenType_Int]       = string_literal("int"),
+    [C_TokenType_Long]      = string_literal("long"),
+
     // Floating-point (sans `long double`)
-    [TYPE_TOKEN_FLOAT]      = lit("float"),
-    [TYPE_TOKEN_DOUBLE]     = lit("double"),
+    [C_TokenType_Float]     = string_literal("float"),
+    [C_TokenType_Double]    = string_literal("double"),
 
     // User-defined
-    [TYPE_TOKEN_STRUCT]     = lit("struct"),
-    [TYPE_TOKEN_ENUM]       = lit("enum"),
-    [TYPE_TOKEN_UNION]      = lit("union"),
-    [TYPE_TOKEN_IDENT]      = lit("<identifier>"),
-    
+    [C_TokenType_Struct]    = string_literal("struct"),
+    [C_TokenType_Enum]      = string_literal("enum"),
+    [C_TokenType_Union]     = string_literal("union"),
+    [C_TokenType_Ident]     = string_literal("<identifier>"),
+
     // Modifiers
-    [TYPE_TOKEN_SIGNED]     = lit("signed"),
-    [TYPE_TOKEN_UNSIGNED]   = lit("unsigned"),
-    [TYPE_TOKEN_COMPLEX]    = lit("complex"),
-    
+    [C_TokenType_Signed]    = string_literal("signed"),
+    [C_TokenType_Unsigned]  = string_literal("unsigned"),
+    [C_TokenType_Complex]   = string_literal("complex"),
+
     // Qualifiers
-    [TYPE_TOKEN_CONST]      = lit("const"),
-    [TYPE_TOKEN_VOLATILE]   = lit("volatile"),
-    [TYPE_TOKEN_RESTRICT]   = lit("restrict"),
-    
+    [C_TokenType_Const]     = string_literal("const"),
+    [C_TokenType_Volatile]  = string_literal("volatile"),
+    [C_TokenType_Restrict]  = string_literal("restrict"),
+
     // Misc.
-    [TYPE_TOKEN_VOID]       = lit("void"),
-    [TYPE_TOKEN_ASTERISK]   = lit("<pointer>"),
-    [TYPE_TOKEN_EOF]        = lit("<eof>"),
-    [TYPE_TOKEN_UNKNOWN]    = lit("<unknown>"),
+    [C_TokenType_Void]      = string_literal("void"),
+    [C_TokenType_Asterisk]  = string_literal("<pointer>"),
+    [C_TokenType_Eof]       = string_literal("<eof>"),
 };
 
-#undef lit
-
-static Type_Token
-set_reserved_or_ident(const Type_Lexer *lexer, String word, Type_Token_Type type)
+static C_Token
+_c_lexer_set_reserved_or_ident(String word, C_TokenType type)
 {
-    if (string_eq(word, TYPE_TOKEN_STRINGS[type])) {
-        return make_token(lexer, type);
-    }
-    return make_token(lexer, TYPE_TOKEN_IDENT);
+    C_Token token   = {C_TokenType_Ident, word};
+    String  keyword = c_token_strings[type];
+    // Reduce overhead from `string_eq` as we assume we are never passing in 0
+    // length strings and never passing in `String`s with the same pointers.
+    if (keyword.len == word.len && memcmp(word.data, keyword.data, keyword.len) == 0)
+        token.type = type;
+    return token;
 }
 
-static Type_Token
-make_reserved_or_ident(const Type_Lexer *lexer)
+static C_Token
+_c_lexer_make_reserved_or_ident(const C_Lexer *lexer)
 {
     String word = {lexer->start, cast(size_t)(lexer->current - lexer->start)};
     switch (word.data[0]) {
+    case 'b': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Bool);
     case 'c':
         switch (word.len) {
-        case 4: return set_reserved_or_ident(lexer, word, TYPE_TOKEN_CHAR);
-        case 5: return set_reserved_or_ident(lexer, word, TYPE_TOKEN_CONST);
-        case 7: return set_reserved_or_ident(lexer, word, TYPE_TOKEN_COMPLEX);
+        case 4: return _c_lexer_set_reserved_or_ident(word, C_TokenType_Char);
+        case 5: return _c_lexer_set_reserved_or_ident(word, C_TokenType_Const);
+        case 7: return _c_lexer_set_reserved_or_ident(word, C_TokenType_Complex);
         }
         break;
-    case 'd': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_DOUBLE);
-    case 'e': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_ENUM);
-    case 'f': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_FLOAT);
-    case 'i': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_INT);
-    case 'l': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_LONG);
-    case 'r': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_RESTRICT);
+    case 'd': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Double);
+    case 'e': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Enum);
+    case 'f': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Float);
+    case 'i': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Int);
+    case 'l': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Long);
+    case 'r': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Restrict);
     case 's':
         if (word.len < 5)
             break;
         switch (word.data[1]) {
-        case 'h': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_SHORT);
-        case 'i': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_SIGNED);
-        case 't': return set_reserved_or_ident(lexer, word, TYPE_TOKEN_STRUCT);
+        case 'h': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Short);
+        case 'i': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Signed);
+        case 't': return _c_lexer_set_reserved_or_ident(word, C_TokenType_Struct);
         }
         break;
     case 'u':
         switch (word.len) {
-        case 5: return set_reserved_or_ident(lexer, word, TYPE_TOKEN_UNION);
-        case 8: return set_reserved_or_ident(lexer, word, TYPE_TOKEN_UNSIGNED);
+        case 5: return _c_lexer_set_reserved_or_ident(word, C_TokenType_Union);
+        case 8: return _c_lexer_set_reserved_or_ident(word, C_TokenType_Unsigned);
         }
         break;
     case 'v':
         switch (word.len) {
-        case 4: return set_reserved_or_ident(lexer, word, TYPE_TOKEN_VOID);
-        case 8: return set_reserved_or_ident(lexer, word, TYPE_TOKEN_VOLATILE);
+        case 4: return _c_lexer_set_reserved_or_ident(word, C_TokenType_Void);
+        case 8: return _c_lexer_set_reserved_or_ident(word, C_TokenType_Volatile);
+        }
+        break;
+    case '_':
+        switch (word.len) {
+        case 5:
+            if (memcmp(word.data, "_Bool", 5) == 0)
+                return _c_lexer_make_token(lexer, C_TokenType_Bool);
+            break;
+        case 8:
+            if (memcmp(word.data, "_Complex", 8) == 0)
+                return _c_lexer_make_token(lexer, C_TokenType_Complex);
+            break;
         }
         break;
     default:
         break;
     }
-    return make_token(lexer, TYPE_TOKEN_IDENT);
+    return _c_lexer_make_token(lexer, C_TokenType_Ident);
 }
 
-Type_Token
-type_lexer_scan(Type_Lexer *lexer)
+C_Token
+c_lexer_scan(C_Lexer *lexer)
 {
-    skip_whitespace(lexer);
+    _c_lexer_skip_whitespace(lexer);
     lexer->start = lexer->current;
-    if (lexer->current >= lexer->end)
-        return make_token(lexer, TYPE_TOKEN_EOF);
 
-    
-    char ch = advance(lexer);
-    if (ascii_is_alpha(ch)) {
-        advance(lexer);
-        while (ascii_is_alnum(peek(lexer)) || peek(lexer) == '_') {
-            advance(lexer);
+    // Exhausted the source text?
+    if (lexer->current >= lexer->end)
+        return _c_lexer_make_token(lexer, C_TokenType_Eof);
+
+
+    char ch = _c_lexer_advance(lexer);
+    if (ascii_is_alpha(ch) || ch == '_') {
+        while (ascii_is_alnum(ch) || ch == '_') {
+            _c_lexer_advance(lexer);
+            ch = _c_lexer_peek(lexer);
         }
-        return make_reserved_or_ident(lexer);
+        return _c_lexer_make_reserved_or_ident(lexer);
     }
-    return make_token(lexer, (ch == '*') ? TYPE_TOKEN_ASTERISK : TYPE_TOKEN_UNKNOWN);
+    return _c_lexer_make_token(lexer, (ch == '*') ? C_TokenType_Asterisk : C_TokenType_Invalid);
 }

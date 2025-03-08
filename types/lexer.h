@@ -2,46 +2,52 @@
 
 #include "types.h"
 
-typedef struct Type_Lexer Type_Lexer;
-struct Type_Lexer {
-    const char *start;
-    const char *current;
-    const char *end;
+typedef struct C_Lexer C_Lexer;
+struct C_Lexer {
+    const char *start;      // The start of this lexeme into the source text.
+    const char *current;    // Our current cursor into the source text.
+    const char *end;        // 1 past the last valid character in the source text.
 };
 
-enum Type_Token_Type {
+enum C_TokenType {
+    C_TokenType_Invalid,
+
+    // Boolean
+    C_TokenType_Bool,
+
     // Integer (sans `long long`)
-    TYPE_TOKEN_CHAR, TYPE_TOKEN_SHORT, TYPE_TOKEN_INT, TYPE_TOKEN_LONG,
+    C_TokenType_Char, C_TokenType_Short, C_TokenType_Int, C_TokenType_Long,
 
     // Floating-point (sans `long double`)
-    TYPE_TOKEN_FLOAT, TYPE_TOKEN_DOUBLE,
+    C_TokenType_Float, C_TokenType_Double,
 
     // User-defined
-    TYPE_TOKEN_STRUCT, TYPE_TOKEN_ENUM, TYPE_TOKEN_UNION, TYPE_TOKEN_IDENT,
+    C_TokenType_Struct, C_TokenType_Enum, C_TokenType_Union, C_TokenType_Ident,
 
     // Modifiers
-    TYPE_TOKEN_SIGNED, TYPE_TOKEN_UNSIGNED, TYPE_TOKEN_COMPLEX,
+    C_TokenType_Signed, C_TokenType_Unsigned, C_TokenType_Complex,
 
     // Qualifiers
-    TYPE_TOKEN_CONST, TYPE_TOKEN_VOLATILE, TYPE_TOKEN_RESTRICT,
+    C_TokenType_Const, C_TokenType_Volatile, C_TokenType_Restrict,
 
     // Misc.
-    TYPE_TOKEN_VOID, TYPE_TOKEN_ASTERISK, TYPE_TOKEN_EOF, TYPE_TOKEN_UNKNOWN,
-    TYPE_TOKEN_COUNT,
+    C_TokenType_Void, C_TokenType_Asterisk, C_TokenType_Eof,
+
+    C_TokenType_Count,
 };
-typedef enum Type_Token_Type Type_Token_Type;
+typedef enum C_TokenType C_TokenType;
 
 extern const String
-TYPE_TOKEN_STRINGS[TYPE_TOKEN_COUNT];
+c_token_strings[C_TokenType_Count];
 
-typedef struct Type_Token Type_Token;
-struct Type_Token {
-    Type_Token_Type type;
-    String          word;
+typedef struct C_Token C_Token;
+struct C_Token {
+    C_TokenType type;
+    String      word;
 };
 
-Type_Lexer
-type_lexer_make(const char *text, size_t len);
+C_Lexer
+c_lexer_make(const char *text, size_t len);
 
-Type_Token
-type_lexer_scan(Type_Lexer *lexer);
+C_Token
+c_lexer_scan(C_Lexer *lexer);

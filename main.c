@@ -5,6 +5,7 @@
 #define STRINGS_IMPLEMENTATION
 #define STRINGS_BUILDER_IMPLEMENTATION
 #define INTERN_IMPLEMENTATION
+#define TYPES_IMPLEMENTATION
 
 #include "mem/allocator.h"
 #include "mem/arena.h"
@@ -18,10 +19,10 @@
 #include <string.h>
 
 static void
-run_interactive(Type_Table *table, Arena *arena)
+run_interactive(Arena *arena)
 {
     Allocator temp_allocator = arena_allocator(arena);
-    char buf[512];
+    char buf[256];
     for (;;) {
         fputs(">>> ", stdout);
         if (!fgets(buf, cast(int)sizeof(buf), stdin)) {
@@ -29,13 +30,23 @@ run_interactive(Type_Table *table, Arena *arena)
             break;
         }
 
-        size_t len = strcspn(buf, "\r\n");
-        buf[len] = '\0';
-        printfln("\'%s\'", buf);
-        if (!type_parse_string(table, buf, len, temp_allocator)) {
-            printfln("Invalid type '%s'.", buf);
+        C_Lexer lexer = c_lexer_make(buf, strcspn(buf, "\r\n"));
+        println("=== TOKENS ===");
+        for (;;) {
+            C_Token token = c_lexer_scan(&lexer);
+            if (!token.type) {
+                printfln("[ERROR]: Invalid token " STRING_QFMTSPEC ".", string_fmtarg(token.word));
+                break;
+            } else if (token.type == C_TokenType_Eof) {
+                break;
+            }
+            printfln(
+                "%s: " STRING_QFMTSPEC,
+                c_token_strings[token.type].data,
+                string_fmtarg(token.word));
         }
-        
+        println("==============\n");
+
         size_t total;
         size_t used  = arena_get_usage(arena, &total);
         printfln(
@@ -59,8 +70,6 @@ main(void)
     if (error)
         return 1;
 
-    Type_Table table = type_table_make(GLOBAL_PANIC_ALLOCATOR);
-
     // testing for alignment
     {
         char *ch = arena_rawalloc(&arena, sizeof(char), alignof(char));
@@ -79,8 +88,7 @@ main(void)
         arena_free_all(&arena);
     }
 
-    run_interactive(&table, &arena);
-    type_table_destroy(&table);
+    run_interactive(&arena);
     arena_destroy(&arena);
     return 0;
 }

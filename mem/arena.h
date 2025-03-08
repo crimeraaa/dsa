@@ -57,7 +57,7 @@ arena_destroy(Arena *arena);
  * @brief
  *      Create a stack-allocated `Allocator` instance out of an `Arena *`.
  *      This is useful to provide access to the general `Allocator` interface.
- *      
+ *
  * @note
  *      Ensure that `arena` is valid for the duration of the resulting allocator!
  *      Otherwise, if at any point `arena` becomes invalid, your allocator will
@@ -70,11 +70,11 @@ arena_allocator(Arena *arena);
  * @brief
  *      Low level memory allocation function for `Arena`. Always gives you back
  *      a new and unique pointer.
- *      
+ *
  * @note
  *      You probably don't want to use this directly unless you are allocating
  *      something like a struct with a flexible-array-member.
- * 
+ *
  *      You should instead use an arena wrapped in an `Allocator` and use the
  *      helper macros `mem_new` and `mem_make`.
  */
@@ -110,12 +110,12 @@ arena_free_all(Arena *arena);
  * @brief
  *      Calculate how many bytes are actively allocated across all the memory
  *      blocks owned by `arena`.
- *      
+ *
  * @param out_total
  *      Optional. Pass the address of a `size_t` if you want to calculate how
  *      many bytes are allocated across all the owned memory blocks. Otherwise,
  *      pass `NULL`.
- *      
+ *
  * @note
  *      For `out_total`, the written value does not consider the space taken up
  *      by the `Memory_Block` header.
@@ -323,7 +323,7 @@ _arena_memory_block_rawalloc(Memory_Block *block, size_t size, size_t align)
     while ((start_addr & (align - 1)) != 0) {
         ++start_addr;
     }
-    
+
     uintptr_t end_addr = start_addr + size;
 
     // New aligned allocation fits?
@@ -369,7 +369,7 @@ arena_rawalloc(Arena *arena, size_t size, size_t align)
         // Do we even have a chance of accomodating this allocation?
         if (block->used + size > block->size)
             continue;
-        
+
         void *data = _arena_memory_block_rawalloc(block, size, align);
         if (data != NULL)
             return data;
@@ -397,15 +397,17 @@ arena_rawresize(Arena *arena, void *old_ptr, size_t old_size, size_t new_size, s
             block->used -= old_size - new_size;
             return old_ptr;
         }
-        
+
         // Does extending the allocation fit?
         size_t added_size  = new_size - old_size;
         size_t result_size = block->used + added_size;
-        if (result_size < block->size) {
+
+        // TODO: check if this is an off-by-one error, or if it's valid
+        if (result_size <= block->size) {
             block->used = result_size;
             return old_ptr;
         }
-    
+
         // We can't extend, so we know we need to get rid of this allocation from
         // this block. We `break` because in `arena_rawalloc()` we will check for
         // blocks that can accomodate us, or allocate a new block.
@@ -413,10 +415,10 @@ arena_rawresize(Arena *arena, void *old_ptr, size_t old_size, size_t new_size, s
         break;
     }
 
-    // Unable to extend nor allocate from an existing block; we need a new
-    // allocation from a new block.
+    // Unable to extend; we should try to get a new allocation from some other
+    // block or even allocate a new block that can accomodate us.
     void *new_ptr = arena_rawalloc(arena, new_size, align);
-    
+
     // memcpy with NULL argument/s is undefined behavior.
     if (new_ptr != NULL && old_ptr != NULL)
         return memcpy(new_ptr, old_ptr, old_size);
@@ -448,7 +450,7 @@ arena_get_usage(const Arena *arena, size_t *out_total)
         used  += block->used;
         total += block->size;
     }
-    
+
     if (out_total != NULL)
         *out_total = total;
     return used;

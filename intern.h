@@ -27,7 +27,7 @@ typedef struct {
 /**
  * @brief
  *      Create a new stack-allocated `Intern` instance with the given allocator.
- * 
+ *
  * @note
  *      Does not allocate anything by default thus no `Allocator_Error` is returned
  *      in any way.
@@ -58,7 +58,7 @@ intern_get(Intern *intern, String text);
  * @brief
  *      Get a nul-terminated (C-style) string from the interned representation
  *      of `text`. If it is not yet interned, we will intern it then.
- *      
+ *
  * @note
  *      No new allocations are made as `Intern_String` is implementation to
  *      always be nul-terminated. Thus, you cannot (and SHOULD not) free the

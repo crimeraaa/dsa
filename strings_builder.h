@@ -85,7 +85,7 @@ string_append_string(String_Builder *builder, String text)
     // Nothing to do. Also avoid undefined behavior with `memcpy`.
     if (text.data == NULL || text.len == 0)
         return ALLOCATOR_ERROR_NONE;
-        
+
     Allocator_Error err = _string_builder_check_resize(builder, text.len);
     if (err)
         return err;

@@ -35,7 +35,7 @@ typedef enum Allocator_Error Allocator_Error;
  *      Please see the documentation for the `mem_*` functions/macros to see
  *      what guarantees must be made by any allocator that chooses to implement
  *      this interface.
- *      
+ *
  *      Useful examples are `GLOBAL_HEAP_ALLOCATOR` for simply wrappers and
  *      `Arena` from `mem/arena.h` for more involved wrappers.
  */
@@ -46,16 +46,16 @@ struct Allocator {
      *      The address of an `Allocator_Error` variable. Must be non-null.
      *      The reason we do it like this is so that we can wrap the returned
      *      pointer with a cast.
-     * 
+     *
      *      If we instead took an out-parameter of type `void **` we would need
      *      to cast the *address* of a pointer to `void **`, e.g.
      *      `mem_rawresize(char, (void **)&buffer, ...)`.
-     * 
+     *
      *      I don't know why, but casting the *address* of something already feels
      *      off. For me, casting to and from 1 level of indirection is already enough.
      */
     void *(*fn)(Allocator_Error *out_error, void *user_ptr, Allocator_Mode mode, Allocator_Args args);
-    
+
     /**
      * @brief
      *      In good old C fashion, this is what is known as the 'context' or
@@ -97,20 +97,20 @@ mem_rawnew(Allocator_Error *out_error, size_t size, size_t align, Allocator allo
 /**
  * @brief
  *      Low-level memory reallocation function for the `Allocator` interface.
- *      
+ *
  *      Unlike `mem_rawnew`, and thus the helper macros `mem_new` and `mem_make`,
  *      this function may not return a unique pointer every time. Some allocators
  *      may be able to 'extend' the allocation pointed to by `old_ptr`.
- *      
+ *
  *      Also, if `old_size` is actually greater than `new_size`, it is possible
  *      for the allocator to simply return `old_ptr` immediately with or without
  *      changing the bookkeeping data.
- * 
+ *
  * @note
  *      In the event that a new pointer is allocated, the old data will be copied
  *      over. Your allocator may also choose to free `old_ptr`. However, this is
  *      not a strict requirement.
- * 
+ *
  *      However, if allocation fails, then `old_ptr` must NOT be freed no matter
  *      what. This is because the caller may wish to handle that error somehow.
  *
@@ -161,13 +161,13 @@ mem_free_all(Allocator allocator);
  *
  * @param out_error
  *      The address of an `Allocator_Error` variable. e.g.
- *      
+ *
  *  ```c
  *          Allocator_Error error;
  *          int *refcount = mem_new(int, &error, allocator);
  *          if (error) { ... } // handle errors here
  *  ```
- * 
+ *
  *      See the documentation for the `fn` member in `Allocator` for more
  *      information.
  *
@@ -188,7 +188,7 @@ mem_free_all(Allocator allocator);
  *      Inspired by the Odin programming language. Deallocates the memory that
  *      `ptr` points to, assuming it only points to 1 instance of the type
  *      pointed to by `ptr`.
- * 
+ *
  * @note
  *      You should only call this function with memory you got from `mem_new`.
  *      If you pass in memory from `mem_make`, your allocator may not have the
@@ -217,7 +217,7 @@ mem_free_all(Allocator allocator);
  *      `count` instances of type `T`.
  *
  * @param out_error
- *      The address of an `Allocator_Error`. See the documentation for the 
+ *      The address of an `Allocator_Error`. See the documentation for the
  *      `fn` member in `Allocator` for more information.
  *
  * @note
@@ -237,11 +237,11 @@ mem_free_all(Allocator allocator);
  *      Inspired by the Odin programming language. Reallocates the memory
  *      for `old_ptr`. May return the same pointer or allocate a new one with
  *      the old data copied over.
- *      
+ *
  * @note
  *      If this succeeds (that is, the result is non-`NULL`) then the memory
  *      pointed to by `old_ptr` may be freed by the allocator.
- *      
+ *
  *      However, if it fails (the result is `NULL`), then `old_ptr` is guaranteed
  *      to not be freed. What you do in that situation is up to you.
  */
