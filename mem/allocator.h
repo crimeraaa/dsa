@@ -2,30 +2,27 @@
 
 #include "../common.h"
 
-enum Allocator_Mode {
-    ALLOCATOR_MODE_ALLOC,
-    ALLOCATOR_MODE_RESIZE,
-    ALLOCATOR_MODE_FREE,
-    ALLOCATOR_MODE_FREE_ALL,
-};
-typedef enum Allocator_Mode Allocator_Mode;
+typedef enum {
+    Allocator_Mode_Alloc,
+    Allocator_Mode_Resize,
+    Allocator_Mode_Free,
+    Allocator_Mode_Free_All,
+} Allocator_Mode;
 
-typedef struct Allocator_Args Allocator_Args;
-struct Allocator_Args {
+typedef struct {
     void  *old_ptr;
     size_t old_size;
     size_t new_size;
     size_t alignment;
-};
+} Allocator_Args;
 
-// The zero-value `ALLOCATOR_ERROR_NONE` indicates success while nonzero indicates
+// The zero-value `Allocator_Error_None` indicates success while nonzero indicates
 // some failure. You can simply check `if (error)`.
-enum Allocator_Error {
-    ALLOCATOR_ERROR_NONE,          // Indicates success.
-    ALLOCATOR_ERROR_OUT_OF_MEMORY, // Can't fulfill an allocation request.
-    ALLOCATOR_ERROR_MODE_NOT_IMPLEMENTED, // e.g. calling `free_all` on the global heap allocator.
-};
-typedef enum Allocator_Error Allocator_Error;
+typedef enum {
+    Allocator_Error_None,          // Indicates success.
+    Allocator_Error_Out_Of_Memory, // Can't fulfill an allocation request.
+    Allocator_Error_Mode_Not_Implemented, // e.g. calling `free_all` on the global heap allocator.
+} Allocator_Error;
 
 /**
  * @brief
@@ -39,8 +36,7 @@ typedef enum Allocator_Error Allocator_Error;
  *      Useful examples are `GLOBAL_HEAP_ALLOCATOR` for simply wrappers and
  *      `Arena` from `mem/arena.h` for more involved wrappers.
  */
-typedef struct Allocator Allocator;
-struct Allocator {
+typedef struct {
     /**
      * @param out_error
      *      The address of an `Allocator_Error` variable. Must be non-null.
@@ -66,7 +62,7 @@ struct Allocator {
      *      For a good example, see the `Arena` implementation in `mem/arena.h`.
      */
     void *user_ptr;
-};
+} Allocator;
 
 // A simple wrapper around the `malloc` family.
 extern const Allocator GLOBAL_HEAP_ALLOCATOR;
@@ -148,7 +144,7 @@ mem_rawfree(void *ptr, size_t size, Allocator allocator);
  *
  * @note
  *      For allocators that do not support this operation (e.g. heap allocators)
- *      simple make the callback function write `ALLOCATOR_ERROR_MODE_NOT_IMPLEMENTED`
+ *      simple make the callback function write `Allocator_Error_Mode_Not_Implemented`
  *      to the `Allocator_Error` out-parameter.
  */
 Allocator_Error
@@ -195,7 +191,7 @@ mem_free_all(Allocator allocator);
  *      book-keeping data to know how many elements are being pointed to!
  *
  * @return
- *      An `Allocator_Error`. If successful, it will be `ALLOCATOR_ERROR_NONE`,
+ *      An `Allocator_Error`. If successful, it will be `Allocator_Error_None`,
  *      which is the zero value. You may thus check for failure with the idiom
  *      `if (error)`, e.g.
  *
@@ -276,25 +272,25 @@ mem_free_all(Allocator allocator);
 static void *
 _global_heap_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator_Mode mode, Allocator_Args args)
 {
-    *out_error = ALLOCATOR_ERROR_NONE;
+    *out_error = Allocator_Error_None;
     unused(user_ptr);
     void *data = NULL;
     switch (mode) {
-    case ALLOCATOR_MODE_ALLOC:
-    case ALLOCATOR_MODE_RESIZE:
+    case Allocator_Mode_Alloc:
+    case Allocator_Mode_Resize:
         // NOTE: If `realloc` fails, `old_ptr` is not freed.
         // Don't free it here, because the caller might still need it!
         data = realloc(args.old_ptr, args.new_size);
         if (data == NULL)
-            *out_error = ALLOCATOR_ERROR_OUT_OF_MEMORY;
+            *out_error = Allocator_Error_Out_Of_Memory;
         break;
 
-    case ALLOCATOR_MODE_FREE:
+    case Allocator_Mode_Free:
         free(args.old_ptr);
         break;
 
-    case ALLOCATOR_MODE_FREE_ALL:
-        *out_error = ALLOCATOR_ERROR_MODE_NOT_IMPLEMENTED;
+    case Allocator_Mode_Free_All:
+        *out_error = Allocator_Error_Mode_Not_Implemented;
         break;
 
     default:
@@ -306,20 +302,20 @@ _global_heap_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator_
 static void *
 _global_panic_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator_Mode mode, Allocator_Args args)
 {
-    *out_error = ALLOCATOR_ERROR_NONE;
+    *out_error = Allocator_Error_None;
     unused(user_ptr);
     void *data = NULL;
     switch (mode) {
-    case ALLOCATOR_MODE_ALLOC:
-    case ALLOCATOR_MODE_RESIZE:
+    case Allocator_Mode_Alloc:
+    case Allocator_Mode_Resize:
         data = realloc(args.old_ptr, args.new_size);
         assert(data != NULL);
         break;
-    case ALLOCATOR_MODE_FREE:
+    case Allocator_Mode_Free:
         free(args.old_ptr);
         break;
-    case ALLOCATOR_MODE_FREE_ALL:
-        *out_error = ALLOCATOR_ERROR_MODE_NOT_IMPLEMENTED;
+    case Allocator_Mode_Free_All:
+        *out_error = Allocator_Error_Mode_Not_Implemented;
         break;
     default:
         assert(false);
@@ -330,14 +326,14 @@ _global_panic_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator
 static void *
 _global_none_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator_Mode mode, Allocator_Args args)
 {
-    *out_error = ALLOCATOR_ERROR_MODE_NOT_IMPLEMENTED;
+    *out_error = Allocator_Error_Mode_Not_Implemented;
     unused(user_ptr);
     unused(args);
     switch (mode) {
-    case ALLOCATOR_MODE_ALLOC:
-    case ALLOCATOR_MODE_RESIZE:
-    case ALLOCATOR_MODE_FREE:
-    case ALLOCATOR_MODE_FREE_ALL:
+    case Allocator_Mode_Alloc:
+    case Allocator_Mode_Resize:
+    case Allocator_Mode_Free:
+    case Allocator_Mode_Free_All:
         break;
     default:
         assert(false);
@@ -356,7 +352,7 @@ Allocator_Error
 mem_free_all(Allocator allocator)
 {
     Allocator_Error error;
-    allocator.fn(&error, allocator.user_ptr, ALLOCATOR_MODE_FREE_ALL, (Allocator_Args){0});
+    allocator.fn(&error, allocator.user_ptr, Allocator_Mode_Free_All, (Allocator_Args){0});
     return error;
 }
 
@@ -369,7 +365,7 @@ mem_rawnew(Allocator_Error *out_error, size_t size, size_t align, Allocator allo
         .new_size   = size,
         .alignment  = align,
     };
-    return allocator.fn(out_error, allocator.user_ptr, ALLOCATOR_MODE_ALLOC, args);
+    return allocator.fn(out_error, allocator.user_ptr, Allocator_Mode_Alloc, args);
 }
 
 void *
@@ -381,7 +377,7 @@ mem_rawresize(Allocator_Error *out_error, void *old_ptr, size_t old_size, size_t
         .new_size   = new_size,
         .alignment  = align,
     };
-    return allocator.fn(out_error, allocator.user_ptr, ALLOCATOR_MODE_RESIZE, args);
+    return allocator.fn(out_error, allocator.user_ptr, Allocator_Mode_Resize, args);
 }
 
 Allocator_Error
@@ -394,7 +390,7 @@ mem_rawfree(void *ptr, size_t size, Allocator allocator)
         .alignment  = 0,
     };
     Allocator_Error error;
-    allocator.fn(&error, allocator.user_ptr, ALLOCATOR_MODE_FREE, args);
+    allocator.fn(&error, allocator.user_ptr, Allocator_Mode_Free, args);
     return error;
 }
 

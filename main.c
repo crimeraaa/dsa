@@ -19,13 +19,12 @@
 #include <setjmp.h>
 #include <stdarg.h>
 
-typedef struct CType_Expr CType_Expr;
-struct CType_Expr {
+typedef struct {
     CType               type;
     CType_QualifierFlag qualifiers;
     CType_BasicFlag     flags;
     jmp_buf             caller;
-};
+} CType_Expr;
 
 __attribute__((format (printf, 2, 3), noreturn))
 static void

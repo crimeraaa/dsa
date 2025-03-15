@@ -16,7 +16,7 @@
  * @link
  *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L5
  */
-enum CType_BasicKind {
+typedef enum {
     CType_BasicKind_Invalid,
     CType_BasicKind_Bool,               // `_Bool` (C99-C17), `bool` (C23)
 
@@ -46,8 +46,7 @@ enum CType_BasicKind {
     // Misc.
     CType_BasicKind_Void,               // `void`
     CType_BasicKind_Count,
-};
-typedef enum CType_BasicKind CType_BasicKind;
+} CType_BasicKind;
 
 /**
  * @brief
@@ -57,7 +56,7 @@ typedef enum CType_BasicKind CType_BasicKind;
  * @link
  *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L296
  */
-enum CType_Kind {
+typedef enum {
     CType_Kind_Invalid,
     CType_Kind_Basic,
     CType_Kind_Pointer,
@@ -65,8 +64,7 @@ enum CType_Kind {
     CType_Kind_Enum,
     CType_Kind_Union,
     CType_Kind_Count,
-};
-typedef enum CType_Kind CType_Kind;
+} CType_Kind;
 
 extern const String
 ctype_kind_strings[CType_Kind_Count];
@@ -77,7 +75,7 @@ typedef struct CType CType;
 #define BIT(N) (1 << (N))
 #endif // BIT
 
-enum CType_BasicFlag {
+typedef enum {
     CType_BasicFlag_Bool        = BIT(0),   // `_Bool`, `bool`
     CType_BasicFlag_Integer     = BIT(1),   // `char`, `short`, `int`, `long`, `long long` and variants thereof.
     CType_BasicFlag_Float       = BIT(2),   // `float`, `double`, `long double` and variants thereof.
@@ -88,15 +86,13 @@ enum CType_BasicFlag {
     CType_BasicFlag_Complex     = BIT(6),   // `complex` variants of the types under `CType_BasicFlag_Float`.
 
     CType_BasicFlag_Numeric     = CType_BasicFlag_Integer | CType_BasicFlag_Signed | CType_BasicFlag_Unsigned | CType_BasicFlag_Float | CType_BasicFlag_Complex,
-};
-typedef enum CType_BasicFlag CType_BasicFlag;
+} CType_BasicFlag;
 
-enum CType_QualifierFlag {
+typedef enum {
     CType_QualifierFlag_Const    = BIT(0),  // Applicable to ALL types.
     CType_QualifierFlag_Volatile = BIT(1),  // Applicable to ALL types.
     CType_QualifierFlag_Restrict = BIT(2),  // Only valid for pointers.
-};
-typedef enum CType_QualifierFlag CType_QualifierFlag;
+} CType_QualifierFlag;
 
 /**
  * @brief
@@ -110,12 +106,11 @@ typedef enum CType_QualifierFlag CType_QualifierFlag;
  *      Depending on the exact situation, they may be interchangeable with their
  *      base types or not.
  */
-typedef struct CType_Info CType_Info;
-struct CType_Info {
+typedef struct {
     const CType         *type;       // Multiple `CType_Info` can refer to the same `CType`.
     CType_QualifierFlag  qualifiers; // Bit set of `CType_QualifierFlag`.
     bool                 is_owner;   // `type` is dynamically-allocated and we own it?
-};
+} CType_Info;
 
 /**
  * @brief
@@ -133,12 +128,11 @@ struct CType_Info {
  * @link
  *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L117
  */
-typedef struct CType_Basic CType_Basic;
-struct CType_Basic {
+typedef struct {
     CType_BasicKind kind;
     CType_BasicFlag flags;  // Bitset of `CType_BasicFlag`.
     String          name;
-};
+} CType_Basic;
 
 /**
  * @brief
@@ -149,23 +143,26 @@ struct CType_Basic {
  * @link
  *      https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L218
  */
-typedef struct CType_Pointer CType_Pointer;
-struct CType_Pointer {
+typedef struct {
     const CType_Info   *pointee;
     CType_QualifierFlag qualifiers;
-};
+} CType_Pointer;
 
 // https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L131
-typedef struct CType_Struct CType_Struct;
-struct CType_Struct {/* TODO */ int i;};
+typedef struct {
+    /* TODO */ int i;
+} CType_Struct;
+
 
 // https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L244
-typedef struct CType_Enum CType_Enum;
-struct CType_Enum {/* TODO */ int i;};
+typedef struct {
+    /* TODO */ int i;
+} CType_Enum;
 
 // https://github.com/odin-lang/Odin/blob/master/src/types.cpp#L131
-typedef struct CType_Union CType_Union;
-struct CType_Union {/* TODO */ int i;};
+typedef struct {
+    /* TODO */ int i;
+} CType_Union;
 
 /**
  * @brief
@@ -189,23 +186,21 @@ struct CType {
 extern const CType
 ctype_basic_types[CType_BasicKind_Count];
 
-typedef struct CType_Entry CType_Entry;
-struct CType_Entry {
+typedef struct {
     CType_Info *info; // Each is dynamically allocated so they can be shared.
-};
+} CType_Entry;
 
 /**
  * @note
  *      The indexes, 0 up to `CType_BasicKind_Count - 1`, must be of type
  *      `CType_BasicKind`. They must be unqualified.
  */
-typedef struct CType_Table CType_Table;
-struct CType_Table {
-    Allocator   allocator;
+typedef struct {
+    Allocator    allocator;
     CType_Entry *entries;
-    size_t      len;
-    size_t      cap;
-};
+    size_t       len;
+    size_t       cap;
+} CType_Table;
 
 Allocator_Error
 ctype_table_init(CType_Table *table, Allocator allocator);

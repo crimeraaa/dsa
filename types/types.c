@@ -79,7 +79,7 @@ ctype_table_init(CType_Table *table, Allocator allocator)
         };
         entries[i].info = info;
     }
-    return ALLOCATOR_ERROR_NONE;
+    return Allocator_Error_None;
 }
 
 void

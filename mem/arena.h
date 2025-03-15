@@ -2,7 +2,6 @@
 
 #include "../common.h"
 #include "allocator.h"
-
 #ifndef ARENA_PAGE_SIZE
 
 // Size of the `Memory_Block` header along with its buffer.
@@ -20,11 +19,10 @@ struct Memory_Block {
 
 static_assert(ARENA_PAGE_SIZE > sizeof(Memory_Block), "ARENA_PAGE_SIZE too small to hold header and data");
 
-typedef struct Arena Arena;
-struct Arena {
+typedef struct {
     Memory_Block *begin; // Primary block we are allocating from.
     Memory_Block *end;   // The oldest block we have.
-};
+} Arena;
 
 /**
  * @brief
@@ -133,25 +131,25 @@ _arena_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator_Mode m
 {
     Arena *arena = cast(Arena *)user_ptr;
     void  *data  = NULL;
-    *out_error = ALLOCATOR_ERROR_NONE;
+    *out_error = Allocator_Error_None;
     switch (mode) {
-    case ALLOCATOR_MODE_ALLOC:
+    case Allocator_Mode_Alloc:
         data = arena_rawalloc(arena, args.new_size, args.alignment);
         if (data == NULL)
-            *out_error = ALLOCATOR_ERROR_OUT_OF_MEMORY;
+            *out_error = Allocator_Error_Out_Of_Memory;
         break;
 
-    case ALLOCATOR_MODE_RESIZE:
+    case Allocator_Mode_Resize:
         data = arena_rawresize(arena, args.old_ptr, args.old_size, args.new_size, args.alignment);
         if (data == NULL)
-            *out_error = ALLOCATOR_ERROR_OUT_OF_MEMORY;
+            *out_error = Allocator_Error_Out_Of_Memory;
         break;
 
-    case ALLOCATOR_MODE_FREE:
-        *out_error = ALLOCATOR_ERROR_MODE_NOT_IMPLEMENTED;
+    case Allocator_Mode_Free:
+        *out_error = Allocator_Error_Mode_Not_Implemented;
         break;
 
-    case ALLOCATOR_MODE_FREE_ALL:
+    case Allocator_Mode_Free_All:
         arena_free_all(arena);
         break;
 
@@ -275,12 +273,12 @@ arena_init(Arena *arena)
 {
     Memory_Block *block = _arena_memory_block_new(ARENA_PAGE_SIZE, NULL);
     if (block == NULL)
-        return ALLOCATOR_ERROR_OUT_OF_MEMORY;
+        return Allocator_Error_Out_Of_Memory;
     *arena = (Arena){
         .begin      = block,
         .end        = block,
     };
-    return ALLOCATOR_ERROR_NONE;
+    return Allocator_Error_None;
 }
 
 void

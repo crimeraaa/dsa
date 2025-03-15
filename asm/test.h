@@ -6,12 +6,10 @@
 typedef long long           ssize_t;
 typedef unsigned long long  size_t;
 
-struct String {
+typedef struct {
     const char *data;
     size_t      len;
-};
-
-typedef struct String String;
+} String ;
 
 // Defined in `cstring.asm`.
 extern size_t

@@ -2,14 +2,13 @@
 
 #include "types.h"
 
-typedef struct CLexer CLexer;
-struct CLexer {
+typedef struct {
     const char *start;      // The start of this lexeme into the source text.
     const char *current;    // Our current cursor into the source text.
     const char *end;        // 1 past the last valid character in the source text.
-};
+} CLexer;
 
-enum CTokenType {
+typedef enum {
     CTokenType_Invalid,
 
     // Boolean
@@ -34,17 +33,15 @@ enum CTokenType {
     CTokenType_Void, CTokenType_Asterisk, CTokenType_Eof,
 
     CTokenType_Count,
-};
-typedef enum CTokenType CTokenType;
+} CTokenType;
 
 extern const String
 ctoken_strings[CTokenType_Count];
 
-typedef struct CToken CToken;
-struct CToken {
+typedef struct {
     CTokenType type;
     String     word;
-};
+} CToken;
 
 CLexer
 clexer_make(const char *text, size_t len);

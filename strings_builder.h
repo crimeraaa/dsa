@@ -76,7 +76,7 @@ _string_builder_check_resize(String_Builder *builder, size_t extra)
         memset(&new_buffer[len], 0, new_cap - len);
         builder->cap = new_cap;
     }
-    return ALLOCATOR_ERROR_NONE;
+    return Allocator_Error_None;
 }
 
 Allocator_Error
@@ -84,7 +84,7 @@ string_append_string(String_Builder *builder, String text)
 {
     // Nothing to do. Also avoid undefined behavior with `memcpy`.
     if (text.data == NULL || text.len == 0)
-        return ALLOCATOR_ERROR_NONE;
+        return Allocator_Error_None;
 
     Allocator_Error err = _string_builder_check_resize(builder, text.len);
     if (err)
@@ -92,7 +92,7 @@ string_append_string(String_Builder *builder, String text)
 
     memcpy(&builder->buffer[builder->len], text.data, text.len);
     builder->len += text.len;
-    return ALLOCATOR_ERROR_NONE;
+    return Allocator_Error_None;
 }
 
 Allocator_Error
@@ -113,7 +113,7 @@ string_prepend_string(String_Builder *builder, String text)
 {
     // Nothing to do. Also avoid undefined behavior with `memcpy`.
     if (text.data == NULL || text.len == 0)
-        return ALLOCATOR_ERROR_NONE;
+        return Allocator_Error_None;
 
     // Move the old text to the new location.
     // e.g. given "hi mom!" (len = 7), prepend "yay " (len = 4)
@@ -130,7 +130,7 @@ string_prepend_string(String_Builder *builder, String text)
     // 3.   Copy new text to old location (0): "yay hi mom!"
     memcpy(&builder->buffer[0], text.data, text.len);
     builder->len += text.len;
-    return ALLOCATOR_ERROR_NONE;
+    return Allocator_Error_None;
 }
 
 Allocator_Error
