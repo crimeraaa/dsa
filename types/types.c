@@ -1,3 +1,5 @@
+#include "../mem/arena.h"
+
 #include "types.h"
 #include "parser.h"
 
@@ -135,12 +137,12 @@ _ctype_add(CType_Table *table, CParser *parser, const Intern_String *name)
     if (error)
         return NULL;
 
-    CType type = parser->type;
+    CType type = parser->data->type;
     if (type.kind == CType_Kind_Basic) {
         *info = (CType_Info){
             .name       = name,
             .type       = &ctype_basic_types[type.basic.kind],
-            .qualifiers = parser->qualifiers,
+            .qualifiers = parser->data->qualifiers,
             .is_owner   = false,
         };
     } else {
@@ -150,11 +152,11 @@ _ctype_add(CType_Table *table, CParser *parser, const Intern_String *name)
             return NULL;
         }
 
-        *_type = parser->type;
+        *_type = parser->data->type;
         *info = (CType_Info){
             .name       = name,
             .type       = _type,
-            .qualifiers = parser->qualifiers,
+            .qualifiers = parser->data->qualifiers,
             .is_owner   = true,
         };
     }
@@ -169,8 +171,10 @@ const CType_Info *
 ctype_get(CType_Table *table, const char *text, size_t len)
 {
     CLexer  lexer  = clexer_make(text, len);
-    CParser parser = cparser_make(global_panic_allocator);
+    CParser parser;
 
+    if (!cparser_init(&parser, table, global_temp_allocator))
+        return NULL;
     if (!cparser_parse(&parser, &lexer))
         return NULL;
 
@@ -199,9 +203,11 @@ ctype_table_print(const CType_Table *table)
     println("=== TABLE ===");
     for (size_t i = 0, len = table->len; i < len; ++i) {
         const CType_Info *info = entries[i].info;
+        const CType      *type = info->type;
         printf("[%zu]: '%s'", i, entries[i].name->data);
-        if (info->is_owner) {
-            println(" (allocated)");
+
+        if (type->kind == CType_Kind_Pointer) {
+            printfln(" -> '%s'", type->pointer.pointee->name->data);
         } else {
             println("");
         }

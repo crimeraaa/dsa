@@ -18,6 +18,9 @@ global_temp_allocator;
 Allocator_Error
 global_temp_allocator_init(void);
 
+void
+global_temp_allocator_destroy(void);
+
 typedef struct Memory_Block Memory_Block;
 struct Memory_Block {
     Memory_Block *prev; // The previous block, likely filled up.
@@ -39,10 +42,6 @@ typedef struct {
  *
  * @return
  *      The error upon the allocation of the said memory block.
- *
- * @note
- *      How the memory is allocated is determined by your platform. E.g. on Linux,
- *      we use `mmap()` whereas on Windows we use `VirtualAlloc()`.
  */
 Allocator_Error
 arena_init(Arena *arena);
@@ -105,10 +104,6 @@ arena_rawresize(Arena *arena, void *old_ptr, size_t old_size, size_t new_size, s
  * @brief
  *      Frees all allocated sub-arenas in our list of owned memory blocks, except
  *      for the very first one we allocated.
- *
- * @note
- *      How the freeing of a `Memory_Block` is implemented depends on your platform.
- *      E.g. on Linux we use `munmap()` whereas on Windows we use `VirtualFree()`.
  */
 void
 arena_free_all(Arena *arena);
@@ -169,88 +164,12 @@ _arena_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator_Mode m
 }
 
 static Arena
-_global_arena;
+_global_arena = {NULL, NULL};
 
 const Allocator
-global_temp_allocator = {_arena_allocator_fn, &_global_arena};
+global_temp_allocator = {&_arena_allocator_fn, &_global_arena};
 
-#ifdef __unix__
-
-// NOTE: `MAP_ANONYMOUS` is only available with Linux kernel version >= 2.4.
-// You may define `_DEFAULT_SOURCE` to get it. Note that because of our header-only
-// nature, it is defined in `common.h` and `common.h` must be included before
-// any standard library headers.
-#include <sys/mman.h>
-
-static inline Memory_Block *
-_arena_memory_block_new(size_t size, Memory_Block *prev)
-{
-    Memory_Block *block = cast(Memory_Block *)mmap(
-        /* addr   */ NULL,
-        /* len    */ size,
-        /* prot   */ PROT_READ | PROT_WRITE,
-        /* flags  */ MAP_ANONYMOUS | MAP_PRIVATE,
-        /* fd     */ -1,
-        /* offset */ 0);
-
-    // Technically mmap *can* map to `NULL`, but it is highly unlikely.
-    if (block == MAP_FAILED)
-        return NULL;
-    block->prev  = prev;
-    block->used  = 0;
-    block->size  = size - sizeof(*block); // our allocation includes the header
-    return block;
-}
-
-static void
-_arena_memory_block_free(Memory_Block *block)
-{
-    int result = munmap(block, block->size + sizeof(*block));
-    // If *this* fails, something horribly wrong has happened.
-    //  -   Either we supplied a bad pointer to `addr` or a bad length to `len`.
-    //  -   This assertion saved me from when I subtracted `new_size` from
-    //      `block->used` instead of subtracting `old_size` which caused unsigned
-    //      integer overflow, because `new_size` was greater than `old_size`!
-    assert(result == 0);
-}
-
-#elif defined(_WIN32)
-
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-
-// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc
-static inline Memory_Block *
-_arena_memory_block_new(size_t size, Memory_Block *prev)
-{
-    Memory_Block *block = cast(Memory_Block *)VirtualAllocEx(
-        /* hProcess         */ GetCurrentProcess(),
-        /* lpAddress        */ NULL,
-        /* dwSize           */ size,
-        /* flAllocationType */ MEM_RESERVE | MEM_COMMIT,
-        /* flProtect        */ PAGE_READWRITE);
-
-    if (block != NULL) {
-        block->prev  = NULL;
-        block->used  = 0;
-        block->size  = size - sizeof(*block);
-    }
-    return block;
-}
-
-// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualfree
-static void
-_arena_memory_block_free(Memory_Block *block)
-{
-    BOOL ok = VirtualFreeEx(GetCurrentProcess(), block, block->size + sizeof(*block), MEM_RELEASE);
-    assert(ok);
-}
-
-#else // _WIN32
-
-#warning Using `malloc`. Please add platform-specific functionality if you can!
-
-#include <stdlib.h> // malloc, free
+#include <stdlib.h> // malloc, free, exit
 
 // Malloc always works, although there's no guarantee it's page-aligned.
 static inline Memory_Block *
@@ -258,7 +177,7 @@ _arena_memory_block_new(size_t size, Memory_Block *prev)
 {
     Memory_Block *block = cast(Memory_Block *)malloc(size);
     if (block != NULL) {
-        block->prev  = NULL;
+        block->prev  = prev;
         block->used  = 0;
         block->size  = size - sizeof(*block);
     }
@@ -270,8 +189,6 @@ _arena_memory_block_free(Memory_Block *block)
 {
     free(block);
 }
-
-#endif // __unix__
 
 /**
  * @brief
@@ -287,6 +204,12 @@ Allocator_Error
 global_temp_allocator_init(void)
 {
     return arena_init(&_global_arena);
+}
+
+void
+global_temp_allocator_destroy(void)
+{
+    arena_destroy(&_global_arena);
 }
 
 Allocator_Error

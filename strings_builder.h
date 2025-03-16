@@ -161,3 +161,14 @@ string_to_cstring(const String_Builder *builder)
     assert(builder->buffer[builder->len] == 0);
     return builder->buffer;
 }
+
+char
+string_pop(String_Builder *builder)
+{
+    if (builder->len == 0)
+        return '\0';
+    char *p  = &builder->buffer[--builder->len];
+    char  ch = *p;
+    *p = '\0';
+    return ch;
+}

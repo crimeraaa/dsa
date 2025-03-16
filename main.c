@@ -3,7 +3,6 @@
 
 #include "mem/allocator.h"
 #include "mem/arena.h"
-#include "strings.h"
 #include "intern.h"
 
 #include "types/types.h"
@@ -53,8 +52,9 @@ run_interactive(CType_Table *table)
 int
 main(void)
 {
-    if (global_temp_allocator_init())
+    if (global_temp_allocator_init() != Allocator_Error_None)
         return 1;
+
 
     Intern          intern = intern_make(global_panic_allocator);
     CType_Table     table;
@@ -63,8 +63,8 @@ main(void)
         return 1;
 
     run_interactive(&table);
-    arena_destroy(&_global_arena);
     ctype_table_destroy(&table);
     intern_destroy(&intern);
+    global_temp_allocator_destroy();
     return 0;
 }

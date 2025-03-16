@@ -4,18 +4,25 @@
 #include "lexer.h"
 #include "../strings.h"
 
-#include <setjmp.h>
+typedef struct CParser_Handler CParser_Handler;
+typedef struct CParser_Data    CParser_Data;
 
-typedef struct {
-    Allocator           allocator;
+struct CParser_Data {
+    CParser_Data       *prev;
     CType               type;
     CType_QualifierFlag qualifiers;
-    CType_BasicFlag     flags;
-    jmp_buf             caller;
+    CType_BasicFlag     basic_flags;
+};
+
+typedef struct {
+    Allocator        allocator;
+    CType_Table     *table;
+    CParser_Data    *data;
+    CParser_Handler *handler;
 } CParser;
 
-CParser
-cparser_make(Allocator allocator);
+bool
+cparser_init(CParser *parser, CType_Table *table, Allocator allocator);
 
 /**
  * @return
@@ -23,11 +30,11 @@ cparser_make(Allocator allocator);
  *      The error message will be printed.
  */
 bool
-cparser_parse(CParser *expr, CLexer *lexer);
+cparser_parse(CParser *parser, CLexer *lexer);
 
 /**
  * @brief
  *      Returns the 'canonical' type name.
  */
 const char *
-cparser_canonicalize(const CParser *expr, String_Builder *builder);
+cparser_canonicalize(CParser *parser, String_Builder *builder);

@@ -368,6 +368,9 @@ string_to_string(const String_Builder *builder);
 const char *
 string_to_cstring(const String_Builder *builder);
 
+char
+string_pop(String_Builder *builder);
+
 #define string_append_literal(builder, literal) string_append_string(builder, string_literal(literal))
 
 // }}} -------------------------------------------------------------------------

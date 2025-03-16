@@ -1,18 +1,36 @@
 #include "parser.h"
 
-#include <stdarg.h>
 #include <assert.h>
+#include <setjmp.h>
+#include <stdarg.h>
 
-CParser
-cparser_make(Allocator allocator)
+struct CParser_Handler {
+    jmp_buf buffer;
+};
+
+bool
+cparser_init(CParser *parser, CType_Table *table, Allocator allocator)
 {
-    CParser parser = {
-        .allocator  = allocator,
-        .type       = ctype_basic_types[CType_BasicKind_Invalid],
-        .flags      = 0,
-        .qualifiers = 0,
+    Allocator_Error error;
+    CParser_Data   *data = mem_new(CParser_Data, &error, allocator);
+    if (error)
+        return false;
+
+    *data = (CParser_Data){
+        .prev        = NULL,
+        .type        = ctype_basic_types[CType_Kind_Invalid],
+        .basic_flags = 0,
+        .qualifiers  = 0,
     };
-    return parser;
+
+    *parser = (CParser){
+        .allocator  = allocator,
+        .table      = table,
+        .data       = data,
+        .handler    = NULL,
+    };
+
+    return true;
 }
 
 __attribute__((format (printf, 2, 3), noreturn))
@@ -27,7 +45,7 @@ _cparser_throw(CParser *parser, const char *fmt, ...)
         putc('\n', stdout);
     }
     va_end(args);
-    longjmp(parser->caller, 1);
+    longjmp(parser->handler->buffer, 1);
 }
 
 /**
@@ -44,7 +62,7 @@ _cparser_set_basic(CParser *parser, CType_BasicKind kind)
         || (CType_BasicKind_Float <= kind && kind <= CType_BasicKind_Double)
         || kind == CType_BasicKind_Void);
 
-    CType type = parser->type;
+    CType type = parser->data->type;
     // Have a type but it's not a basic one?
     if (type.kind != CType_Kind_Invalid && type.kind != CType_Kind_Basic) have_nonbasic_type: {
         _cparser_throw(parser, "Cannot assign '%s' to '%s'",
@@ -124,10 +142,10 @@ _cparser_set_basic(CParser *parser, CType_BasicKind kind)
     good_combination:
 
     // Implicitly sets `parser->type.basic.kind`.
-    parser->type = ctype_basic_types[type.basic.kind];
+    parser->data->type = ctype_basic_types[type.basic.kind];
     printfln("%s: '%s'",
-        ctype_kind_strings[parser->type.kind].data,
-        parser->type.basic.name.data);
+        ctype_kind_strings[parser->data->type.kind].data,
+        parser->data->type.basic.name.data);
 }
 
 /**
@@ -153,19 +171,20 @@ _cparser_set_modifier(CParser *parser, CType_BasicFlag modifier)
 
     // Modifier is already set to something?
     // Disallows `signed signed`, `signed unsigned`, etc.
-    if (parser->flags & (CType_BasicFlag_Signed | CType_BasicFlag_Unsigned | CType_BasicFlag_Complex)) {
+    CType_BasicFlag flags = parser->data->basic_flags;
+    if (flags & (CType_BasicFlag_Signed | CType_BasicFlag_Unsigned | CType_BasicFlag_Complex)) {
         // Perhaps there's a better way to do this...
         const char *prev_name;
-        if (parser->flags & CType_BasicFlag_Signed)
+        if (flags & CType_BasicFlag_Signed)
             prev_name = "signed";
-        else if (parser->flags & CType_BasicFlag_Unsigned)
+        else if (flags & CType_BasicFlag_Unsigned)
             prev_name = "unsigned";
         else // if (parser->flags & CType_BasicFlag_Complex)
             prev_name = "complex";
         _cparser_throw(parser, "Cannot combine modifiers '%s' and '%s'", prev_name, name);
     }
 
-    parser->flags |= modifier;
+    parser->data->basic_flags |= modifier;
     printfln("CType_BasicFlag: '%s'", name);
 }
 
@@ -192,9 +211,9 @@ _cparser_set_qualifier(CParser *parser, CType_QualifierFlag qualifier)
 
     // Qualifier is already set?
     // NOTE: 'const const int' is valid in C99, but I dislike it.
-    if (parser->qualifiers & qualifier)
+    if (parser->data->qualifiers & qualifier)
         _cparser_throw(parser, "Duplicate qualifier '%s'", name);
-    parser->qualifiers |= qualifier;
+    parser->data->qualifiers |= qualifier;
     printfln("CType_QualifierFlag: '%s'", name);
 }
 
@@ -207,9 +226,15 @@ _cparser_set_qualifier(CParser *parser, CType_QualifierFlag qualifier)
 static void
 _cparser_semantic_error(CParser *parser, const char *name)
 {
-    // TODO: Don't assume we can just use `type.basic`!
-    String culprit = parser->type.basic.name;
-    _cparser_throw(parser, "Cannot use %s with " STRING_QFMTSPEC, name, string_fmtarg(culprit));
+    CType type = parser->data->type;
+    if (type.kind == CType_Kind_Basic) {
+        String culprit = type.basic.name;
+        _cparser_throw(parser, "Cannot use %s with " STRING_QFMTSPEC, name, string_fmtarg(culprit));
+    } else if (type.kind == CType_Kind_Pointer) {
+        _cparser_throw(parser, "Cannot use %s with a pointer", name);
+    } else {
+        _cparser_throw(parser, "Unknown semantic error");
+    }
 }
 
 /**
@@ -221,8 +246,9 @@ _cparser_semantic_error(CParser *parser, const char *name)
 static void
 _cparser_check_semantics(CParser *parser)
 {
-    CType          *type  = &parser->type;
-    CType_BasicFlag flags = parser->flags; // Very different from `type->basic.flags`!
+    CParser_Data   *data  = parser->data;
+    CType          *type  = &data->type;
+    CType_BasicFlag flags = data->basic_flags; // Very different from `type->basic.flags`!
 
     // No type was given?
     if (type->kind == CType_Kind_Invalid) {
@@ -294,25 +320,72 @@ _cparser_check_semantics(CParser *parser)
     }
 
     // Finally, check the qualifiers. We only really care about 'restrict'.
-    if (parser->qualifiers & CType_QualifierFlag_Restrict) {
+    if (data->qualifiers & CType_QualifierFlag_Restrict) {
         if (type->kind != CType_Kind_Pointer)
             _cparser_semantic_error(parser, "restrict");
     }
+
+    // For non-basic types, fill in their missing data.
+    switch (type->kind) {
+    // Pointers should already have their pointees set in `_cparser_set_pointer()`.
+    case CType_Kind_Pointer:
+        type->pointer.qualifiers = data->qualifiers;
+        break;
+    case CType_Kind_Struct:
+    case CType_Kind_Enum:
+    case CType_Kind_Union:
+    default:
+        __builtin_unreachable();
+    }
+}
+
+static void
+_cparser_set_pointer(CParser *parser, CParser_Data *prev)
+{
+    _cparser_check_semantics(parser);
+    Allocator_Error error;
+    CParser_Data   *pointer = mem_new(CParser_Data, &error, parser->allocator);
+    if (error)
+        _cparser_throw(parser, "Out of memory!");
+
+
+    char buf[256];
+    String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
+    const char    *name    = cparser_canonicalize(parser, &builder);
+
+    printfln("Pointer to: '%s'", name);
+
+    // TODO: Works, but very inefficient!
+    const CType_Info *info = ctype_get(parser->table, name, string_builder_len(&builder));
+    *pointer = (CParser_Data){
+        .prev        = prev,
+        .type        = {.kind = CType_Kind_Pointer, .pointer = {.pointee = info, .qualifiers = 0}},
+        .basic_flags = 0,
+        .qualifiers  = 0,
+    };
+
+    parser->data = pointer;
 }
 
 bool
 cparser_parse(CParser *parser, CLexer *lexer)
 {
-    if (setjmp(parser->caller) != 0)
+    CParser_Handler handler;
+    if (setjmp(handler.buffer) == 0) {
+        parser->handler = &handler;
+    } else {
+        parser->handler = NULL;
         return false;
+    }
 
     for (;;) {
         CToken token = clexer_scan(lexer);
         if (!token.type) {
             _cparser_throw(parser, "Invalid token " STRING_QFMTSPEC ".", string_fmtarg(token.word));
-            return false;
+            // goes to `setjmp` above
         } else if (token.type == CTokenType_Eof) {
             _cparser_check_semantics(parser);
+            parser->handler = NULL;
             return true;
         }
 
@@ -347,32 +420,38 @@ cparser_parse(CParser *parser, CLexer *lexer)
 
         // Misc.
         case CTokenType_Void:      _cparser_set_basic(parser, CType_BasicKind_Void); break;
-        case CTokenType_Asterisk:
-            goto unsupported_token;
+        case CTokenType_Asterisk:  _cparser_set_pointer(parser, parser->data);       break;
 
         default: unsupported_token:
             _cparser_throw(parser, STRING_QFMTSPEC " ('%s') is unsupported!",
                 string_fmtarg(token.word),
                 ctoken_strings[token.type].data);
-            return false;
         }
     }
 
-    return false;
+    __builtin_unreachable();
 }
 
 const char *
-cparser_canonicalize(const CParser *parser, String_Builder *builder)
+cparser_canonicalize(CParser *parser, String_Builder *builder)
 {
-    CType type = parser->type;
-
-    // Qualifiers
-    if (parser->qualifiers & CType_QualifierFlag_Const)
-        string_append_literal(builder, "const ");
-    if (parser->qualifiers & CType_QualifierFlag_Volatile)
-        string_append_literal(builder, "volatile ");
-    if (parser->qualifiers & CType_QualifierFlag_Restrict)
-        string_append_literal(builder, "restrict ");
+    CParser_Data *data = parser->data;
+    // e.g. given `int *`, our data is at `*` so print `int` first.
+    if (data->prev) {
+        parser->data = data->prev;
+        cparser_canonicalize(parser, builder);
+        parser->data = data;
+    }
+    
+    CType_QualifierFlag qualifiers = data->qualifiers;
+    const CType         type       = data->type;
+    bool                is_pointer = (type.kind == CType_Kind_Pointer);
+    if (!is_pointer) {
+        if (qualifiers & CType_QualifierFlag_Const)
+            string_append_literal(builder, "const ");
+        if (qualifiers & CType_QualifierFlag_Volatile)
+            string_append_literal(builder, "volatile ");
+    }
 
     // No need to print the modifiers since they're already part of the basic types.
     switch (type.kind) {
@@ -383,12 +462,32 @@ cparser_canonicalize(const CParser *parser, String_Builder *builder)
         string_append_string(builder, type.basic.name);
         break;
     case CType_Kind_Pointer:
+        // Generally, don't poke at the `String_Builder` members directly.
+        // Doing it just this once...
+        if (builder->buffer[builder->len - 1] == '*')
+            string_append_char(builder, '*');
+        else
+            string_append_literal(builder, " *");
+        break;
     case CType_Kind_Struct:
     case CType_Kind_Enum:
     case CType_Kind_Union:
     default:
         string_append_literal(builder, "<unimplemented>");
         break;
+    }
+
+    if (is_pointer) {
+        if (qualifiers & CType_QualifierFlag_Const)
+            string_append_literal(builder, "const ");
+        if (qualifiers & CType_QualifierFlag_Volatile)
+            string_append_literal(builder, "volatile ");
+        if (qualifiers & CType_QualifierFlag_Restrict)
+            string_append_literal(builder, "restrict ");
+
+        // Remove the trailing whitespace for the last qualifier.
+        if (qualifiers != 0)
+            string_pop(builder);
     }
 
     return string_to_cstring(builder);
