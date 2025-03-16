@@ -39,9 +39,9 @@ typedef enum {
     CType_BasicKind_Float,              // `float`
     CType_BasicKind_Double,             // `double`
     CType_BasicKind_Long_Double,        // `long double`, `double long`
-    CType_BasicKind_Complex_Float,      // `complex float`, `float complex`
-    CType_BasicKind_Complex_Double,     // `complex double`, `double complex`, `complex`
-    CType_BasicKind_Complex_Long_Double,// `complex long double`, `complex double long`, `long complex double`, `long double complex`, `long complex`, `complex long`
+    CType_BasicKind_Float_Complex,      // `float complex`, `complex float`
+    CType_BasicKind_Double_Complex,     // `double complex`, `complex double`, `complex`
+    CType_BasicKind_Long_Double_Complex,// `long double complex`, `long complex`, ...
 
     // Misc.
     CType_BasicKind_Void,               // `void`
@@ -107,6 +107,7 @@ typedef enum {
  *      base types or not.
  */
 typedef struct {
+    const Intern_String *name;       // Canonical name.
     const CType         *type;       // Multiple `CType_Info` can refer to the same `CType`.
     CType_QualifierFlag  qualifiers; // Bit set of `CType_QualifierFlag`.
     bool                 is_owner;   // `type` is dynamically-allocated and we own it?
@@ -131,7 +132,7 @@ typedef struct {
 typedef struct {
     CType_BasicKind kind;
     CType_BasicFlag flags;  // Bitset of `CType_BasicFlag`.
-    String          name;
+    String          name;   // Canonical name.
 } CType_Basic;
 
 /**
@@ -187,7 +188,8 @@ extern const CType
 ctype_basic_types[CType_BasicKind_Count];
 
 typedef struct {
-    CType_Info *info; // Each is dynamically allocated so they can be shared.
+    const Intern_String *name; // Canonical name.
+    CType_Info          *info; // Each is dynamically allocated so they can be shared.
 } CType_Entry;
 
 /**
@@ -197,24 +199,22 @@ typedef struct {
  */
 typedef struct {
     Allocator    allocator;
+    Intern      *intern;
     CType_Entry *entries;
     size_t       len;
     size_t       cap;
 } CType_Table;
 
 Allocator_Error
-ctype_table_init(CType_Table *table, Allocator allocator);
+ctype_table_init(CType_Table *table, Intern *intern, Allocator allocator);
 
 void
 ctype_table_destroy(CType_Table *table);
 
 const CType_Info *
-ctype_table_get_basic_unqual(CType_Table *table, CType_BasicKind kind);
+ctype_get(CType_Table *table, const char *text, size_t len);
 
-const CType_Info *
-ctype_table_get_basic_qual(CType_Table *table, CType_BasicKind kind, CType_QualifierFlag qualifiers);
-
-const CType_Info *
-ctype_table_add_basic_qual(CType_Table *table, CType_BasicKind kind, CType_QualifierFlag qualifiers);
+void
+ctype_table_print(const CType_Table *table);
 
 #undef BIT

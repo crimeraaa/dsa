@@ -7,11 +7,15 @@
 #include <setjmp.h>
 
 typedef struct {
+    Allocator           allocator;
     CType               type;
     CType_QualifierFlag qualifiers;
     CType_BasicFlag     flags;
     jmp_buf             caller;
 } CParser;
+
+CParser
+cparser_make(Allocator allocator);
 
 /**
  * @return

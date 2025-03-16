@@ -1,4 +1,5 @@
 #include "types.h"
+#include "parser.h"
 
 #include <assert.h>
 
@@ -42,16 +43,16 @@ ctype_basic_types[CType_BasicKind_Count] = {
     {CType_Kind_Basic,   {{CType_BasicKind_Float,               CType_BasicFlag_Float,                              string_literal("float")}}},
     {CType_Kind_Basic,   {{CType_BasicKind_Double,              CType_BasicFlag_Float,                              string_literal("double")}}},
     {CType_Kind_Basic,   {{CType_BasicKind_Long_Double,         CType_BasicFlag_Float,                              string_literal("long double")}}},
-    {CType_Kind_Basic,   {{CType_BasicKind_Float,               CType_BasicFlag_Float | CType_BasicFlag_Complex,    string_literal("complex float")}}},
-    {CType_Kind_Basic,   {{CType_BasicKind_Double,              CType_BasicFlag_Float | CType_BasicFlag_Complex,    string_literal("complex double")}}},
-    {CType_Kind_Basic,   {{CType_BasicKind_Long_Double,         CType_BasicFlag_Float | CType_BasicFlag_Complex,    string_literal("complex long double")}}},
+    {CType_Kind_Basic,   {{CType_BasicKind_Float,               CType_BasicFlag_Float | CType_BasicFlag_Complex,    string_literal("float complex")}}},
+    {CType_Kind_Basic,   {{CType_BasicKind_Double,              CType_BasicFlag_Float | CType_BasicFlag_Complex,    string_literal("double complex")}}},
+    {CType_Kind_Basic,   {{CType_BasicKind_Long_Double,         CType_BasicFlag_Float | CType_BasicFlag_Complex,    string_literal("long double complex")}}},
 
     // Misc. Types
     {CType_Kind_Basic,   {{CType_BasicKind_Void,               0,                                                   string_literal("void")}}},
 };
 
 Allocator_Error
-ctype_table_init(CType_Table *table, Allocator allocator)
+ctype_table_init(CType_Table *table, Intern *intern, Allocator allocator)
 {
     Allocator_Error error;
     CType_Entry    *entries = mem_make(CType_Entry, &error, count_of(ctype_basic_types), allocator);
@@ -60,6 +61,7 @@ ctype_table_init(CType_Table *table, Allocator allocator)
 
     *table = (CType_Table){
         .allocator = allocator,
+        .intern    = intern,
         .entries   = entries,
         .len       = count_of(ctype_basic_types),
         .cap       = count_of(ctype_basic_types),
@@ -67,16 +69,22 @@ ctype_table_init(CType_Table *table, Allocator allocator)
 
     // Add all the unqualified basic types
     for (size_t i = 0; i < count_of(ctype_basic_types); ++i) {
-        // CType type = ctype_basic_types[i];
+        const CType          type = ctype_basic_types[i];
+        const Intern_String *name = intern_get_interned(intern, type.basic.name);
+        if (name == NULL)
+            return Allocator_Error_Out_Of_Memory;
+
         CType_Info *info = mem_new(CType_Info, &error, allocator);
         if (error)
             return error;
 
         *info = (CType_Info){
+            .name       = name,
             .type       = &ctype_basic_types[i],
             .qualifiers = 0,
             .is_owner   = false,
         };
+        entries[i].name = name;
         entries[i].info = info;
     }
     return Allocator_Error_None;
@@ -91,8 +99,10 @@ ctype_table_destroy(CType_Table *table)
         CType_Info *info = entries[i].info;
         // the unqualified basic types are allocated in read-only memory, so
         // `info->is_owner` will be false.
-        if (info->is_owner)
+        if (info->is_owner) {
+            printfln("Freeing '%s'...", info->name->data);
             mem_free(cast(CType *)info->type, allocator);
+        }
         mem_free(info, allocator);
     }
     mem_delete(entries, table->cap, allocator);
@@ -101,44 +111,17 @@ ctype_table_destroy(CType_Table *table)
     table->cap     = 0;
 }
 
-const CType_Info *
-ctype_table_get_basic_unqual(CType_Table *table, CType_BasicKind kind)
+static const CType_Info *
+_ctype_add(CType_Table *table, CParser *parser, const Intern_String *name)
 {
-    // `CType_BasicKind_Invalid` and `CType_BasicKind_Count` are not valid.
-    assert(CType_BasicKind_Bool <= kind && kind <= CType_BasicKind_Void);
-    return table->entries[kind].info;
-}
-
-const CType_Info *
-ctype_table_get_basic_qual(CType_Table *table, CType_BasicKind kind, CType_QualifierFlag qualifiers)
-{
-    if (qualifiers == 0)
-        return ctype_table_get_basic_unqual(table, kind);
-
-    // Check if this `kind` with these `qualifiers` already exists
-    CType_Entry *entries = table->entries;
-    for (size_t i = 0, len = table->len; i < len; ++i) {
-        const CType_Info *info = entries[i].info;
-        // Is this even a basic type with the right qualifiers?
-        if (info->type->kind == CType_Kind_Basic && info->qualifiers == qualifiers) {
-            // Might be it, but is it the exact one?
-            if (info->type->basic.kind == kind)
-                return info;
-        }
-    }
-    return NULL;
-}
-
-const CType_Info *
-ctype_table_add_basic_qual(CType_Table *table, CType_BasicKind kind, CType_QualifierFlag qualifiers)
-{
-    size_t old_cap = table->cap;
+    Allocator allocator = table->allocator;
+    size_t    old_cap   = table->cap;
     // Need to resize?
     if (table->len >= old_cap) {
         // NOTE: assume `table->cap` is never 0 by this point!
         size_t          new_cap = old_cap * 2;
         Allocator_Error error;
-        CType_Entry    *entries = mem_resize(CType_Entry, &error, table->entries, old_cap, new_cap, table->allocator);
+        CType_Entry    *entries = mem_resize(CType_Entry, &error, table->entries, old_cap, new_cap, allocator);
         if (error)
             return NULL;
 
@@ -146,17 +129,82 @@ ctype_table_add_basic_qual(CType_Table *table, CType_BasicKind kind, CType_Quali
         table->cap     = new_cap;
     }
 
+
     Allocator_Error error;
-    CType_Info     *info = mem_new(CType_Info, &error, table->allocator);
+    CType_Info     *info = mem_new(CType_Info, &error, allocator);
     if (error)
         return NULL;
 
-    *info = (CType_Info){
-        .type       = &ctype_basic_types[kind],
-        .qualifiers = qualifiers,
-        .is_owner   = false,
-    };
+    CType type = parser->type;
+    if (type.kind == CType_Kind_Basic) {
+        *info = (CType_Info){
+            .name       = name,
+            .type       = &ctype_basic_types[type.basic.kind],
+            .qualifiers = parser->qualifiers,
+            .is_owner   = false,
+        };
+    } else {
+        CType *_type = mem_new(CType, &error, allocator);
+        if (error) {
+            mem_free(info, allocator);
+            return NULL;
+        }
 
-    table->entries[table->len++].info = info;
+        *_type = parser->type;
+        *info = (CType_Info){
+            .name       = name,
+            .type       = _type,
+            .qualifiers = parser->qualifiers,
+            .is_owner   = true,
+        };
+    }
+
+    CType_Entry *entry = &table->entries[table->len++];
+    entry->name = name;
+    entry->info = info;
     return info;
+}
+
+const CType_Info *
+ctype_get(CType_Table *table, const char *text, size_t len)
+{
+    CLexer  lexer  = clexer_make(text, len);
+    CParser parser = cparser_make(global_panic_allocator);
+
+    if (!cparser_parse(&parser, &lexer))
+        return NULL;
+
+    // WARNING: May not be enough!
+    char buf[256];
+    String_Builder builder = string_builder_make_fixed(buf, sizeof buf);
+    cparser_canonicalize(&parser, &builder);
+    const Intern_String *name = intern_get_interned(table->intern, string_to_string(&builder));
+
+    // TODO: Use canonical name as a hash lookup
+    CType_Entry *entries = table->entries;
+    for (size_t i = 0, len = table->len; i < len; ++i) {
+        CType_Entry entry = entries[i];
+        if (entry.name == name) {
+            return entry.info;
+        }
+    }
+    return _ctype_add(table, &parser, name);
+}
+
+void
+ctype_table_print(const CType_Table *table)
+{
+    const CType_Entry *entries = table->entries;
+    // TODO: Refactor to be a hashtable
+    println("=== TABLE ===");
+    for (size_t i = 0, len = table->len; i < len; ++i) {
+        const CType_Info *info = entries[i].info;
+        printf("[%zu]: '%s'", i, entries[i].name->data);
+        if (info->is_owner) {
+            println(" (allocated)");
+        } else {
+            println("");
+        }
+    }
+    println("=============\n");
 }

@@ -19,7 +19,7 @@ string_builder_make_fixed(char *buffer, size_t cap)
 {
     // The memset is very important to ensure nul-termination.
     String_Builder builder = {
-        .allocator = GLOBAL_NONE_ALLOCATOR,
+        .allocator = global_none_allocator,
         .buffer    = cast(char *)memset(buffer, 0, cap),
         .len       = 0,
         .cap       = cap,

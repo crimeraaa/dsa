@@ -3,6 +3,18 @@
 #include <stdarg.h>
 #include <assert.h>
 
+CParser
+cparser_make(Allocator allocator)
+{
+    CParser parser = {
+        .allocator  = allocator,
+        .type       = ctype_basic_types[CType_BasicKind_Invalid],
+        .flags      = 0,
+        .qualifiers = 0,
+    };
+    return parser;
+}
+
 __attribute__((format (printf, 2, 3), noreturn))
 static void
 _cparser_throw(CParser *parser, const char *fmt, ...)
@@ -80,7 +92,7 @@ _cparser_set_basic(CParser *parser, CType_BasicKind kind)
             type.basic.kind = CType_BasicKind_Long_Double;
         // Allow `complex long`.
         else if (type.basic.flags & CType_BasicFlag_Complex)
-            type.basic.kind = CType_BasicKind_Complex_Long_Double;
+            type.basic.kind = CType_BasicKind_Long_Double_Complex;
         else
             goto bad_combination;
         break;
@@ -222,7 +234,7 @@ _cparser_check_semantics(CParser *parser)
             *type = ctype_basic_types[CType_BasicKind_Unsigned_Int];
         // `complex` resolves to `complex double`.
         else if (flags & CType_BasicFlag_Complex)
-            *type = ctype_basic_types[CType_BasicKind_Complex_Double];
+            *type = ctype_basic_types[CType_BasicKind_Double_Complex];
         else
             _cparser_throw(parser, "No base type received.");
     }
@@ -264,15 +276,15 @@ _cparser_check_semantics(CParser *parser)
         // Ensure we have the correct basic type data.
         switch (type->basic.kind) {
         case CType_BasicKind_Float:
-            *type = ctype_basic_types[CType_BasicKind_Complex_Float];
+            *type = ctype_basic_types[CType_BasicKind_Float_Complex];
             break;
         case CType_BasicKind_Double:
-            *type = ctype_basic_types[CType_BasicKind_Complex_Double];
+            *type = ctype_basic_types[CType_BasicKind_Double_Complex];
             break;
         // Allow `long complex`. `complex long` is handled by `_cparser_set_basic()`.
         case CType_BasicKind_Long:
         case CType_BasicKind_Long_Double:
-            *type = ctype_basic_types[CType_BasicKind_Complex_Long_Double];
+            *type = ctype_basic_types[CType_BasicKind_Long_Double_Complex];
             break;
 
         // Unreachable.

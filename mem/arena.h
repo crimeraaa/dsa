@@ -12,6 +12,12 @@
 #define ARENA_PAGE_SIZE    4096
 #endif // ARENA_PAGE_SIZE
 
+extern const Allocator
+global_temp_allocator;
+
+Allocator_Error
+global_temp_allocator_init(void);
+
 typedef struct Memory_Block Memory_Block;
 struct Memory_Block {
     Memory_Block *prev; // The previous block, likely filled up.
@@ -162,6 +168,12 @@ _arena_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator_Mode m
     return data;
 }
 
+static Arena
+_global_arena;
+
+const Allocator
+global_temp_allocator = {_arena_allocator_fn, &_global_arena};
+
 #ifdef __unix__
 
 // NOTE: `MAP_ANONYMOUS` is only available with Linux kernel version >= 2.4.
@@ -269,6 +281,12 @@ static inline size_t
 _arena_max(size_t a, size_t b)
 {
     return a > b ? a : b;
+}
+
+Allocator_Error
+global_temp_allocator_init(void)
+{
+    return arena_init(&_global_arena);
 }
 
 Allocator_Error

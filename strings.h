@@ -275,7 +275,7 @@ typedef struct {
  *      Creates a stack-allocated `String_Builder` which also contains the given
  *      `allocator`. E.g:
  * ```
- * String_Builder builder = string_builder_make(GLOBAL_HEAP_ALLOCATOR);
+ * String_Builder builder = string_builder_make(global_heap_allocator);
  * ```
  *
  * @note
@@ -296,7 +296,7 @@ string_builder_make(Allocator allocator);
  * ```
  *
  * @note
- *      The resulting `String_Builder` will contain `GLOBAL_NONE_ALLOCATOR` as
+ *      The resulting `String_Builder` will contain `global_none_allocator` as
  *      its buffer cannot be resized nor freed. It is used mainly to provide a
  *      valid `Allocator` interface.
  */
@@ -310,7 +310,7 @@ string_builder_make_fixed(char *buffer, size_t cap);
  *
  * @note
  *      This is valid to call even when `builder` came from `string_builder_make_fixed()`.
- *      In such case, the `GLOBAL_NONE_ALLOCATOR` will simply do nothing.
+ *      In such case, the `global_none_allocator` will simply do nothing.
  */
 void
 string_builder_destroy(String_Builder *builder);

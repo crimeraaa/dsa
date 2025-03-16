@@ -37,7 +37,7 @@ typedef enum {
  *      what guarantees must be made by any allocator that chooses to implement
  *      this interface.
  *
- *      Useful examples are `GLOBAL_HEAP_ALLOCATOR` for simply wrappers and
+ *      Useful examples are `global_heap_allocator` for simply wrappers and
  *      `Arena` from `mem/arena.h` for more involved wrappers.
  */
 typedef struct {
@@ -69,15 +69,15 @@ typedef struct {
 } Allocator;
 
 // A simple wrapper around the `malloc` family.
-extern const Allocator GLOBAL_HEAP_ALLOCATOR;
+extern const Allocator global_heap_allocator;
 
 // Panics when an allocation request cannot be fulfilled.
-extern const Allocator GLOBAL_PANIC_ALLOCATOR;
+extern const Allocator global_panic_allocator;
 
 // An interface that simply returns `NULL` for all allocation requests.
 // This is useful for types that require an allocator interface but can use
 // fixed-size memory, e.g. `String_Builder`.
-extern const Allocator GLOBAL_NONE_ALLOCATOR;
+extern const Allocator global_none_allocator;
 
 /**
  * @brief
@@ -346,9 +346,9 @@ _global_none_allocator_fn(Allocator_Error *out_error, void *user_ptr, Allocator_
 }
 
 const Allocator
-GLOBAL_HEAP_ALLOCATOR  = {&_global_heap_allocator_fn,  NULL},
-GLOBAL_PANIC_ALLOCATOR = {&_global_panic_allocator_fn, NULL},
-GLOBAL_NONE_ALLOCATOR  = {&_global_none_allocator_fn,  NULL};
+global_heap_allocator  = {&_global_heap_allocator_fn,  NULL},
+global_panic_allocator = {&_global_panic_allocator_fn, NULL},
+global_none_allocator  = {&_global_none_allocator_fn,  NULL};
 
 //=== }}} ======================================================================
 
