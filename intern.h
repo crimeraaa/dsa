@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef DSA_IMPLEMENTATION
+#define DSA_INTERN_IMPLEMENTATION
+#endif // DSA_IMPLEMENTATION
+
 #include <stdint.h>
 #include <stdio.h>
 
@@ -79,7 +83,7 @@ intern_get_cstring(Intern *intern, String text);
 const Intern_String *
 intern_get_interned(Intern *intern, String text);
 
-#ifdef INTERN_IMPLEMENTATION
+#ifdef DSA_INTERN_IMPLEMENTATION
 
 #include <string.h> // memcmp, memcpy (likely highly optimized)
 #include <stdio.h>  // fprintf
@@ -316,4 +320,4 @@ intern_get_interned(Intern *intern, String text)
         return entry->value;
 }
 
-#endif // INTERN_IMPLEMENTATION
+#endif // DSA_INTERN_IMPLEMENTATION

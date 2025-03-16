@@ -132,11 +132,6 @@ ctype_table_get_basic_qual(CType_Table *table, CType_BasicKind kind, CType_Quali
 const CType_Info *
 ctype_table_add_basic_qual(CType_Table *table, CType_BasicKind kind, CType_QualifierFlag qualifiers)
 {
-    // Reuse existing entries if at all possible.
-    const CType_Info *found = ctype_table_get_basic_qual(table, kind, qualifiers);
-    if (found)
-        return found;
-
     size_t old_cap = table->cap;
     // Need to resize?
     if (table->len >= old_cap) {

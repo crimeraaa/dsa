@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef DSA_IMPLEMENTATION
+#define DSA_ASCII_IMPLEMENTATION
+#endif // DSA_IMPLEMENTATION
+
 #include "common.h"
 
 bool
@@ -21,7 +25,7 @@ ascii_is_lower(char ch);
 bool
 ascii_is_whitespace(char ch);
 
-#ifdef ASCII_IMPLEMENTATION
+#ifdef DSA_ASCII_IMPLEMENTATION
 
 bool
 ascii_is_alpha(char ch)
@@ -67,4 +71,4 @@ ascii_is_whitespace(char ch)
     }
 }
 
-#endif // ASCII_IMPLEMENTATION
+#endif // DSA_ASCII_IMPLEMENTATION

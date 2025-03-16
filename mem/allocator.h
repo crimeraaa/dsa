@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef DSA_IMPLEMENTATION
+#define DSA_ALLOCATOR_IMPLEMENTATION
+#endif // DSA_IMPLEMENTATION
+
 #include "../common.h"
 
 typedef enum {
@@ -262,7 +266,7 @@ mem_free_all(Allocator allocator);
         sizeof(*ptr) * count,                                                  \
         allocator)
 
-#ifdef ALLOCATOR_IMPLEMENTATION
+#ifdef DSA_ALLOCATOR_IMPLEMENTATION
 
 #include <stdlib.h>
 #include <assert.h>
@@ -394,4 +398,4 @@ mem_rawfree(void *ptr, size_t size, Allocator allocator)
     return error;
 }
 
-#endif // ALLOCATOR_IMPLEMENTATION
+#endif // DSA_ALLOCATOR_IMPLEMENTATION

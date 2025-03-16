@@ -1,5 +1,11 @@
 #pragma once
 
+#ifdef DSA_IMPLEMENTATION
+#define DSA_STRINGS_IMPLEMENTATION
+#define DSA_STRINGS_BUILDER_IMPLEMENTATION
+#endif // DSA_IMPLEMENTATION
+
+
 #include "common.h"
 #include "mem/allocator.h"
 
@@ -362,9 +368,11 @@ string_to_string(const String_Builder *builder);
 const char *
 string_to_cstring(const String_Builder *builder);
 
+#define string_append_literal(builder, literal) string_append_string(builder, string_literal(literal))
+
 // }}} -------------------------------------------------------------------------
 
-#ifdef STRINGS_IMPLEMENTATION
+#ifdef DSA_STRINGS_IMPLEMENTATION
 
 #include "ascii.h"  // ascii_is_whitespace
 
@@ -672,8 +680,8 @@ string_split_string_iterator(String *current, String *state, String sep)
 
 #endif // STRING_IMPLEMENTATION
 
-#ifdef STRINGS_BUILDER_IMPLEMENTATION
+#ifdef DSA_STRINGS_BUILDER_IMPLEMENTATION
 
 #include "strings_builder.h"
 
-#endif // STRINGS_BUILDER_IMPLEMENTATION
+#endif // DSA_STRINGS_BUILDER_IMPLEMENTATION

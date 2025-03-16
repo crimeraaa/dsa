@@ -1,12 +1,15 @@
 #pragma once
 
+#ifdef DSA_IMPLEMENTATION
+#define DSA_ARENA_IMPLEMENTATION
+#endif // DSA_IMPLEMENTATION
+
 #include "../common.h"
 #include "allocator.h"
-#ifndef ARENA_PAGE_SIZE
 
+#ifndef ARENA_PAGE_SIZE
 // Size of the `Memory_Block` header along with its buffer.
 #define ARENA_PAGE_SIZE    4096
-
 #endif // ARENA_PAGE_SIZE
 
 typedef struct Memory_Block Memory_Block;
@@ -17,7 +20,7 @@ struct Memory_Block {
     char          base[]; // Size is usually in relation to `ARENA_PAGE_SIZE`.
 };
 
-static_assert(ARENA_PAGE_SIZE > sizeof(Memory_Block), "ARENA_PAGE_SIZE too small to hold header and data");
+_Static_assert(ARENA_PAGE_SIZE > sizeof(Memory_Block), "ARENA_PAGE_SIZE too small to hold header and data");
 
 typedef struct {
     Memory_Block *begin; // Primary block we are allocating from.
@@ -121,7 +124,7 @@ arena_free_all(Arena *arena);
 size_t
 arena_get_usage(const Arena *arena, size_t *out_total);
 
-#ifdef ARENA_IMPLEMENTATION
+#ifdef DSA_ARENA_IMPLEMENTATION
 
 #include <assert.h> // assert
 #include <string.h> // memcpy
@@ -454,4 +457,4 @@ arena_get_usage(const Arena *arena, size_t *out_total)
     return used;
 }
 
-#endif // ARENA_IMPLEMENTATION
+#endif // DSA_ARENA_IMPLEMENTATION

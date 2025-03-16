@@ -59,9 +59,17 @@ _string_builder_check_resize(String_Builder *builder, size_t extra)
 {
     size_t cap = builder->cap;
     size_t len = builder->len;
+
     // Need to fit resulting text along with nul termination as well.
-    if (len + extra + 1 >= cap) {
-        size_t          new_cap = (cap == 0) ? 8 : cap * 2;
+    size_t new_cap = len + extra + 1;
+    if (new_cap >= cap) {
+        // If `new_cap` isn't already a power of 2, round up to the next one.
+        size_t tmp = 8;
+        while (tmp <= new_cap) {
+            tmp *= 2;
+        }
+        new_cap = tmp;
+
         Allocator_Error error;
         char           *new_buffer = mem_resize(char, &error, builder->buffer, cap, new_cap, builder->allocator);
         if (error)
